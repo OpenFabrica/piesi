@@ -1,0 +1,19 @@
+[package]
+name = "piesi-cli"
+description = "Piesi 命令行：列目录、解压、压缩，也是语料回归测试入口"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "piesi"
+path = "src/main.rs"
+
+[dependencies]
+piesi-core = { path = "../piesi-core" }
+clap.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true

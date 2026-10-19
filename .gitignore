@@ -1,0 +1,22 @@
+# Rust
+/target
+**/target
+Cargo.lock.bak
+
+# Apple：工程文件由 xcodegen 生成，XCFramework 由脚本生成，都不入库
+/apple/*.xcodeproj
+/apple/PiesiCore.xcframework
+/apple/Generated/
+/apple/build/
+/apple/DerivedData/
+/apple/*.xcworkspace
+
+# 生成的大体积语料与基准数据
+/tests/corpus/generated/
+/bench/
+
+# 系统与编辑器
+.DS_Store
+*.swp
+.idea/
+.vscode/

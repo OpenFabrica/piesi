@@ -1,0 +1,54 @@
+[workspace]
+resolver = "2"
+members = ["crates/piesi-core", "crates/piesi-ffi", "crates/piesi-cli"]
+
+[workspace.package]
+version = "0.1.0-dev"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/rambocode/piesi"
+
+# 所有依赖在这里锁版本；成员 crate 用 `dep.workspace = true` 引用
+[workspace.dependencies]
+# 格式与编解码
+zip = { version = "=9.0.5", default-features = false, features = ["deflate", "aes-crypto", "time"] }
+sevenz-rust2 = { version = "=0.24.1", default-features = false, features = ["aes256", "compress", "util"] }
+unrar = "=0.5.8"
+tar = "=0.4.46"
+flate2 = "=1.1.10"
+bzip2 = "=0.6.1"
+liblzma = { version = "=0.4.9", features = ["static"] }
+zstd = "=0.14.3"
+deflate64 = "=0.1.12"
+ppmd-rust = "=1.5.1"
+crc32fast = "=1.5.2"
+# 加密
+aes = "=0.9.3"
+hmac = "=0.13.0"
+pbkdf2 = "=0.13.0"
+sha1 = "=0.11.0"
+# 编码与文件名
+encoding_rs = "=0.8.42"
+chardetng = "=1.0.0"
+unicode-normalization = "=0.1.26"
+unicode-segmentation = "=1.13.3"
+# 文件系统与安全
+cap-std = "=4.0.3"
+xattr = "=1.6.1"
+memmap2 = "=0.9.11"
+# 并行与基础
+rayon = "=1.12.0"
+thiserror = "=2.0.21"
+anyhow = "=1.0.104"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+tracing = "=0.1.44"
+# FFI 与 CLI
+uniffi = "=0.32.2"
+clap = { version = "=4.6.7", features = ["derive"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+debug = 1

@@ -1,0 +1,18 @@
+# 第三方许可说明
+
+## unRAR（RAR 解压）
+
+`crates/piesi-core` 通过 `unrar` crate 链接 RARLAB 的 unRAR 源码。
+unRAR 许可允许在任何软件中免费使用（含商用），但有以下限制，原文照抄：
+
+> The unRAR sources cannot be used to re-create the RAR compression algorithm,
+> which is proprietary. Distribution of modified unRAR sources in separate form
+> or as a part of other software is permitted, provided that it is clearly
+> stated in the documentation and source comments that the code may not be used
+> to develop a RAR (WinRAR) compatible archiver.
+
+因此 Piesi 只能解压 RAR，不能创建 RAR。此限制与 MIT/Apache-2.0 并存，只约束 unRAR 相关代码。
+
+## 其他依赖
+
+其余 Rust 依赖均为 MIT / Apache-2.0 / BSD / 0BSD 许可，完整清单可用 `cargo license` 生成。

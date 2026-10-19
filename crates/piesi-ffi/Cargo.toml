@@ -1,0 +1,21 @@
+[package]
+name = "piesi-ffi"
+description = "Piesi 引擎的 UniFFI 导出层"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+name = "piesi_ffi"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+
+[dependencies]
+piesi-core = { path = "../piesi-core" }
+uniffi = { workspace = true, features = ["cli"] }
+thiserror.workspace = true
