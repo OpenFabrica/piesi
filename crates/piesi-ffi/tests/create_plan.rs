@@ -116,3 +116,40 @@ fn create_cancelled_leaves_no_file() {
     assert!(!dest.exists(), "取消后不应留下半个文件");
     fs::remove_dir_all(&dir).unwrap();
 }
+
+
+#[test]
+fn verify_detects_corruption() {
+    let dir = scratch("verify");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).unwrap();
+    // 仅存储（level 0），数据原样进包，方便定位后翻转一个字节
+    let payload: Vec<u8> = (0..20_000u32).map(|i| (i % 251) as u8).collect();
+    fs::write(src.join("data.bin"), &payload).unwrap();
+    let dest = dir.join("out.zip");
+    let req = CreateRequest {
+        dest: dest.to_string_lossy().into_owned(),
+        sources: vec![src.to_string_lossy().into_owned()],
+        format: CreateFormat::Zip,
+        level: 0,
+        password: None,
+        encrypt_names: false,
+        skip_junk: true,
+        windows_safe: false,
+    };
+    create_archive(req, Arc::new(Quiet), CancelHandle::new()).unwrap();
+
+    let archive = open_archive(dest.to_string_lossy().into_owned(), None).unwrap();
+    let ok = archive.verify(vec![], Arc::new(Quiet), CancelHandle::new()).unwrap();
+    assert!(ok.entries >= 1);
+    drop(archive);
+
+    let mut bytes = fs::read(&dest).unwrap();
+    let pos = bytes.windows(payload.len()).position(|w| w == payload.as_slice()).expect("存储模式下应能找到原始数据");
+    bytes[pos + 10_000] ^= 0xFF;
+    fs::write(&dest, &bytes).unwrap();
+    let archive = open_archive(dest.to_string_lossy().into_owned(), None).unwrap();
+    let err = archive.verify(vec![], Arc::new(Quiet), CancelHandle::new()).unwrap_err();
+    assert!(matches!(err, piesi_ffi::PiesiError::Other { .. }), "损坏应报错：{err:?}");
+    fs::remove_dir_all(&dir).unwrap();
+}

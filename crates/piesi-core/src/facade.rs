@@ -1,9 +1,10 @@
 //! 对外门面：打开压缩包 → 识别文件名编码 → 解码 → 规划 → 安全解压。
 //! UI、CLI、FFI 都只经过这一层，不直接碰驱动。
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use crate::archive::{ArchiveReader, Entry, EntryId, ExtractReport, Format, IndexState, PasswordNeed};
+use crate::archive::{ArchiveReader, Entry, EntryId, EntrySink, ExtractReport, Format, IndexState, PasswordNeed};
 use crate::encoding::{decode_all, detect, Detection, NameEncoding};
 use crate::fs::{read_quarantine, DirSink, FileSink};
 use crate::plan::{plan_extract, ExtractOptions, ExtractPlan, PlanSink};
@@ -145,9 +146,33 @@ impl Archive {
         Ok(ExtractOutcome { report, root: plan.root.clone(), skipped_junk: plan.skipped_junk, conflicts: plan.conflicts.clone() })
     }
 
+    /// 校验压缩包：把全部（或选中）条目解到丢弃式接收端，驱动照常走完解码和 CRC 校验，但不写盘。
+    /// 返回的 extracted 是校验过的条目数；数据损坏、密码错误都以 Err 返回。
+    pub fn verify(&mut self, selected: Option<&[EntryId]>, ctx: &OpContext<'_>) -> Result<ExtractReport> {
+        let mut sink = DiscardSink;
+        self.reader.extract(selected, &mut sink, ctx)
+    }
+
     /// 读取单个条目内容（预览用）。
     pub fn read_entry(&mut self, id: EntryId, out: &mut dyn std::io::Write, ctx: &OpContext<'_>) -> Result<()> {
         self.reader.read_entry(id, out, ctx)
+    }
+}
+
+/// 只读不落盘的接收端：文件内容读完就丢，目的是让驱动完整跑一遍解码与 CRC。
+struct DiscardSink;
+
+impl EntrySink for DiscardSink {
+    fn dir(&mut self, _entry: &Entry) -> Result<()> {
+        Ok(())
+    }
+
+    fn file(&mut self, _entry: &Entry, data: &mut dyn Read) -> Result<u64> {
+        Ok(std::io::copy(data, &mut std::io::sink())?)
+    }
+
+    fn symlink(&mut self, _entry: &Entry, _target: &[u8]) -> Result<()> {
+        Ok(())
     }
 }
 

@@ -95,6 +95,21 @@ enum Cmd {
         #[arg(short, long)]
         quiet: bool,
     },
+    /// 校验压缩包（解码 + CRC，不写盘）
+    #[command(alias = "test")]
+    T {
+        path: PathBuf,
+        #[arg(long, value_enum)]
+        encoding: Option<EncodingArg>,
+        #[arg(short, long)]
+        password: Option<String>,
+        /// 只校验这些条目 id（`list --json` 里的 id）
+        #[arg(long = "id")]
+        ids: Vec<u32>,
+        /// 不打印进度
+        #[arg(short, long)]
+        quiet: bool,
+    },
     /// 创建压缩包
     #[command(alias = "add")]
     A {
@@ -280,6 +295,29 @@ fn main() -> anyhow::Result<()> {
             }
             eprintln!("已解压 {} 项到 {}（跳过 {}，垃圾 {}）", outcome.report.extracted, outcome.root.display(), outcome.report.skipped, outcome.skipped_junk);
             for w in &outcome.report.warnings {
+                eprintln!("警告：{w}");
+            }
+        }
+        Cmd::T { path, encoding, password, ids, quiet } => {
+            let mut archive = Archive::open_system(&path)?;
+            if let Some(pw) = password.as_deref() {
+                archive.set_password(Some(pw))?;
+            }
+            if let Some(enc) = encoding {
+                archive.set_encoding(enc.into());
+            }
+            let progress = StderrProgress { last: Mutex::new(String::new()) };
+            let token = CancelToken::new();
+            let silent = piesi_core::progress::NoProgress;
+            let ctx = if quiet { OpContext::new(&silent, &token) } else { OpContext::new(&progress, &token) };
+            let selected = if ids.is_empty() { None } else { Some(ids.as_slice()) };
+            // 损坏、密码错误都会以 Err 冒出来，进程退出码非 0
+            let report = archive.verify(selected, &ctx)?;
+            if !quiet {
+                eprint!("\r\x1b[2K");
+            }
+            eprintln!("校验通过：{} 项（跳过 {}）", report.extracted, report.skipped);
+            for w in &report.warnings {
                 eprintln!("警告：{w}");
             }
         }

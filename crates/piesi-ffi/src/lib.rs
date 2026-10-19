@@ -186,6 +186,15 @@ pub struct ExtractPlanInfo {
     pub skipped_junk: u64,
 }
 
+/// 校验结果。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct VerifyResult {
+    /// 校验过的条目数
+    pub entries: u64,
+    pub skipped: u64,
+    pub warnings: Vec<String>,
+}
+
 /// 进度快照。
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ProgressInfo {
@@ -443,6 +452,16 @@ impl ArchiveHandle {
             warnings: plan.warnings,
             skipped_junk: plan.skipped_junk,
         })
+    }
+
+    /// 校验压缩包（解码 + CRC，不写盘）。ids 空 = 全部。长操作，放后台线程；数据损坏以错误返回。
+    pub fn verify(&self, ids: Vec<u32>, listener: Arc<dyn ProgressListener>, cancel: Arc<CancelHandle>) -> Result<VerifyResult, PiesiError> {
+        let mut a = self.inner.lock().unwrap();
+        let progress = ListenerAdapter(listener);
+        let ctx = OpContext::new(&progress, &cancel.token);
+        let selected = if ids.is_empty() { None } else { Some(ids.as_slice()) };
+        let report = a.verify(selected, &ctx)?;
+        Ok(VerifyResult { entries: report.extracted, skipped: report.skipped, warnings: report.warnings })
     }
 
     /// 把单个条目解到临时文件（Quick Look 预览用），返回临时文件路径。
