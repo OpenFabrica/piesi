@@ -18,6 +18,8 @@ jobs:
         run: cargo test --workspace --locked
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: 冒烟（与 7zz / unzip / bsdtar 交叉验证）
+        run: scripts/smoke.sh
 
   app:
     runs-on: macos-15
