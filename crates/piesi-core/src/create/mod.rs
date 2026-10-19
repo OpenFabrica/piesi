@@ -45,6 +45,9 @@ pub struct CreateOptions {
     pub skip_junk: bool,
     /// 把文件名改成 Windows 安全名（「发给 Windows」预设）
     pub windows_safe: bool,
+    /// 「Mac 专用」预设：把 Finder 信息、扩展属性、资源分支写成 `__MACOSX/._名字` AppleDouble 条目
+    /// （与 ditto / 归档工具兼容）。只对 zip 生效，其它格式暂时忽略
+    pub mac_metadata: bool,
     /// 线程数，0 = CPU 核数
     pub threads: usize,
     /// 7z solid 块大小上限（字节），0 = 非 solid
@@ -60,6 +63,7 @@ impl Default for CreateOptions {
             encrypt_names: false,
             skip_junk: true,
             windows_safe: false,
+            mac_metadata: false,
             threads: 0,
             solid_block_bytes: 128 * 1024 * 1024,
         }
@@ -187,7 +191,7 @@ pub fn create_archive(dest: &Path, roots: &[PathBuf], opts: &CreateOptions, ctx:
         ..Default::default()
     };
     match opts.format {
-        CreateFormat::Zip => crate::create::zip_writer::write_zip(dest, &sources, opts, ctx)?,
+        CreateFormat::Zip => report.warnings.extend(crate::create::zip_writer::write_zip(dest, &sources, opts, ctx)?),
         CreateFormat::SevenZ => crate::create::sevenz_writer::write_7z(dest, &sources, opts, ctx)?,
         CreateFormat::TarGz | CreateFormat::TarXz | CreateFormat::TarZst => crate::create::tar_writer::write_tar(dest, &sources, opts, ctx)?,
     }
@@ -195,6 +199,7 @@ pub fn create_archive(dest: &Path, roots: &[PathBuf], opts: &CreateOptions, ctx:
     Ok(report)
 }
 
+pub mod apple_double;
 pub mod sevenz_writer;
 pub mod tar_writer;
 pub mod zip_writer;

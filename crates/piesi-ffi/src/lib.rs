@@ -560,6 +560,10 @@ pub struct CreateRequest {
     pub skip_junk: bool,
     /// 「发给 Windows」：改成 Windows 安全名
     pub windows_safe: bool,
+    /// 「Mac 专用」：xattr / 资源分支 / Finder 信息写成 `__MACOSX/._名字` AppleDouble（只对 zip 生效）。
+    /// 带默认值，生成的 Swift 构造器里是可选参数，老调用点不用改
+    #[uniffi(default = false)]
+    pub mac_metadata: bool,
 }
 
 /// 压缩结果。
@@ -583,6 +587,7 @@ pub fn create_archive(request: CreateRequest, listener: Arc<dyn ProgressListener
         encrypt_names: request.encrypt_names,
         skip_junk: request.skip_junk,
         windows_safe: request.windows_safe,
+        mac_metadata: request.mac_metadata,
         ..CreateOptions::default()
     };
     let roots: Vec<PathBuf> = request.sources.iter().map(PathBuf::from).collect();

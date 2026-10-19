@@ -57,6 +57,7 @@ fn create_then_plan_and_extract_zip() {
         encrypt_names: false,
         skip_junk: true,
         windows_safe: false,
+        mac_metadata: false,
     };
     let report = create_archive(req, Arc::new(Quiet), CancelHandle::new()).unwrap();
     assert_eq!(report.skipped_junk, 1, "应跳过 .DS_Store");
@@ -115,6 +116,7 @@ fn create_cancelled_leaves_no_file() {
         encrypt_names: false,
         skip_junk: true,
         windows_safe: false,
+        mac_metadata: false,
     };
     let err = create_archive(req, Arc::new(Quiet), cancel).unwrap_err();
     assert!(matches!(err, piesi_ffi::PiesiError::Cancelled), "{err:?}");
@@ -141,6 +143,7 @@ fn verify_detects_corruption() {
         encrypt_names: false,
         skip_junk: true,
         windows_safe: false,
+        mac_metadata: false,
     };
     create_archive(req, Arc::new(Quiet), CancelHandle::new()).unwrap();
 

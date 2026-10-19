@@ -138,7 +138,7 @@
 写入：
 - 一律 UTF-8 + bit 11 + NFC 归一化；可选同时写 0x7075 给老工具。
 - 「发给 Windows」预设再做：替换 `\ / : * ? " < > |`、去尾部空格和点、提示保留名（CON、PRN、NUL…）、路径超过 240 字符提示。
-- 不写 `__MACOSX` 和 AppleDouble；「Mac 专用」预设才保留 xattr/资源分支（写成 `._` AppleDouble，与 ditto 兼容）。
+- 不写 `__MACOSX` 和 AppleDouble；「Mac 专用」预设才保留 xattr/资源分支（写成 `._` AppleDouble，与 ditto 兼容）。已实现（2026-10-19，`crates/piesi-core/src/create/apple_double.rs`）：产物与 `ditto -c -k --sequesterRsrc` 逐字节一致（`tests/mac_metadata.rs` 比对）；`._` 条目紧跟各自条目，`__MACOSX/…/` 目录条目只写一次；跳过 quarantine / decmpfs，单个 fork 上限 64 MB、条目表 64 KB；入口 CLI `piesi a --mac-metadata`、FFI `CreateRequest.mac_metadata`。只对 zip 生效，tar 的 PAX xattr 未做。
 
 ### 5.3 安全与文件系统规则
 - 所有输出走 `cap-std` 的 `Dir`：系统调用层拦截 `..`、绝对路径、穿越 symlink；symlink 最后创建；拒绝 Windows 盘符与 `\\?\`。

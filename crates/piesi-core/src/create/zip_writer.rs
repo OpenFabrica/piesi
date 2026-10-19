@@ -1,7 +1,8 @@
 //! 自写 ZIP 写入器：UTF-8 + bit 11、NFC（上游已做）、zip64、Unix 权限、UT 时间戳，
-//! 多文件并行 deflate。不用 `zip` crate 的原因：它没有「接收已压缩数据」的接口，做不了并行。
+//! 多文件并行 deflate，可选「Mac 专用」的 `__MACOSX/._名字` AppleDouble 条目。
+//! 不用 `zip` crate 的原因：它没有「接收已压缩数据」的接口，做不了并行。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::{self, BufWriter, Read, Seek, Write};
 use std::path::Path;
@@ -11,6 +12,7 @@ use flate2::write::DeflateEncoder;
 use flate2::Compression;
 
 use crate::archive::EntryKind;
+use crate::create::apple_double;
 use crate::create::{CreateOptions, SourceItem, Sources};
 use crate::progress::{OpContext, Throttle};
 use crate::{Error, Result};
@@ -79,8 +81,8 @@ struct CentralRecord {
     local_offset: u64,
 }
 
-/// 写出一个 ZIP。
-pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpContext<'_>) -> Result<()> {
+/// 写出一个 ZIP，返回写入过程中产生的 warning（目前只有 Mac 元数据读取/跳过的提示）。
+pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpContext<'_>) -> Result<Vec<String>> {
     let threads = if opts.threads == 0 { std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4) } else { opts.threads };
     let level = Compression::new(zip_level(opts.level));
     let spill_dir = dest.parent().unwrap_or(Path::new(".")).to_path_buf();
@@ -88,6 +90,7 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
     let mut out = CountingWriter { inner: BufWriter::with_capacity(1 << 20, file), offset: 0 };
     let mut throttle = Throttle::new(ctx, Some(sources.total_bytes), Some(sources.items.len() as u64));
     let mut records: Vec<CentralRecord> = Vec::with_capacity(sources.items.len());
+    let mut warnings: Vec<String> = Vec::new();
 
     // 并行压缩：worker 池按 index 乱序产出，主线程用 BTreeMap 按序回收后顺序写入。
     // 有界通道限制同时在飞的结果数，内存不会随文件数线性增长。
@@ -98,6 +101,7 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
     let out_ref = &mut out;
     let records_ref = &mut records;
     let throttle_ref = &mut throttle;
+    let warnings_ref = &mut warnings;
     let spill_dir_ref = &spill_dir;
     let result: Result<()> = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
@@ -107,6 +111,7 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
             let out = out_ref;
             let records = records_ref;
             let throttle = throttle_ref;
+            let warnings = warnings_ref;
             let spill_dir = spill_dir_ref;
             // 生产者：只有文件需要压缩；目录和符号链接在主线程直接写
             let tx_files = tx.clone();
@@ -128,8 +133,10 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
                 }
             });
 
-            // 消费者（当前线程）：按 index 顺序写入
+            // 消费者（当前线程）：按 index 顺序写入；Mac 元数据的 `._` 条目紧跟在各自的条目后面，
+            // 和 ditto 一样，`__MACOSX/…/` 目录条目只在第一次用到时补一条
             let mut pending: BTreeMap<usize, Compressed> = BTreeMap::new();
+            let mut macosx_dirs: BTreeSet<String> = BTreeSet::new();
             for (index, item) in items.iter().enumerate() {
                 throttle.begin_entry(&item.rel)?;
                 match item.kind {
@@ -137,6 +144,9 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
                         let name = format!("{}/", item.rel).into_bytes();
                         let rec = write_local(out, name, METHOD_STORE, 0, 0, 0, item, 0x10)?;
                         records.push(rec);
+                        if opts.mac_metadata {
+                            write_apple_double(out, records, item, &mut macosx_dirs, level, opts.level == 0, warnings)?;
+                        }
                     }
                     EntryKind::Symlink => {
                         let target = item.link_target.clone().unwrap_or_default();
@@ -172,6 +182,9 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
                         }
                         throttle.add_bytes(comp.size)?;
                         records.push(rec);
+                        if opts.mac_metadata {
+                            write_apple_double(out, records, item, &mut macosx_dirs, level, opts.level == 0, warnings)?;
+                        }
                     }
                 }
             }
@@ -214,7 +227,65 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
     out.inner.flush()?;
     out.inner.get_ref().sync_all()?;
     throttle.finish();
+    Ok(warnings)
+}
+
+/// 「Mac 专用」：读 item 的 Finder 信息、扩展属性、资源分支，打成 AppleDouble 写成
+/// `__MACOSX/<同目录>/._<名字>` 条目，紧跟在 item 自己的条目后面；没有元数据就什么都不写。
+/// 读元数据失败只记 warning 不中断——丢一个文件的标签不值得让整个包失败。符号链接由调用方跳过。
+#[allow(clippy::too_many_arguments)]
+fn write_apple_double(out: &mut CountingWriter, records: &mut Vec<CentralRecord>, item: &SourceItem, macosx_dirs: &mut BTreeSet<String>, level: Compression, store_only: bool, warnings: &mut Vec<String>) -> Result<()> {
+    let meta = match apple_double::read(&item.path, warnings) {
+        Ok(m) => m,
+        Err(e) => {
+            warnings.push(format!("读取 Mac 元数据失败，已跳过：{}：{e}", item.path.display()));
+            return Ok(());
+        }
+    };
+    if meta.is_empty() {
+        return Ok(());
+    }
+    let ad_rel = apple_double::apple_double_rel(&item.rel);
+    ensure_macosx_dirs(out, records, &ad_rel, item, macosx_dirs)?;
+    let raw = apple_double::encode(&meta);
+    let (method, payload) = deflate_bytes(&raw, level, store_only)?;
+    // `._` 条目和 ditto 一样：普通文件、0644、时间跟原条目
+    let ad_item = SourceItem { rel: ad_rel.clone(), path: item.path.clone(), kind: EntryKind::File, size: raw.len() as u64, mtime: item.mtime, mode: Some(0o644), link_target: None };
+    let rec = write_local(out, ad_rel.into_bytes(), method, crc32fast::hash(&raw), payload.len() as u64, raw.len() as u64, &ad_item, 0)?;
+    out.write_all(&payload)?;
+    records.push(rec);
     Ok(())
+}
+
+/// 补 `__MACOSX/`、`__MACOSX/a/`、`__MACOSX/a/b/` 这些目录条目（ditto 也会写），每个只写一次。
+fn ensure_macosx_dirs(out: &mut CountingWriter, records: &mut Vec<CentralRecord>, ad_rel: &str, item: &SourceItem, done: &mut BTreeSet<String>) -> Result<()> {
+    let parent = ad_rel.rsplit_once('/').map(|(p, _)| p).unwrap_or_default();
+    let mut acc = String::with_capacity(parent.len());
+    for comp in parent.split('/') {
+        if !acc.is_empty() {
+            acc.push('/');
+        }
+        acc.push_str(comp);
+        if done.insert(acc.clone()) {
+            let dir_item = SourceItem { rel: acc.clone(), path: item.path.clone(), kind: EntryKind::Dir, size: 0, mtime: item.mtime, mode: Some(0o755), link_target: None };
+            let rec = write_local(out, format!("{acc}/").into_bytes(), METHOD_STORE, 0, 0, 0, &dir_item, 0x10)?;
+            records.push(rec);
+        }
+    }
+    Ok(())
+}
+
+/// 在内存里 deflate 一段小数据（AppleDouble 最多 64 MB 量级），没变小就改存储，和文件条目的规则一致。
+fn deflate_bytes(raw: &[u8], level: Compression, store_only: bool) -> Result<(u16, Vec<u8>)> {
+    if !store_only {
+        let mut enc = DeflateEncoder::new(Vec::with_capacity(raw.len() / 2 + 64), level);
+        enc.write_all(raw)?;
+        let packed = enc.finish()?;
+        if packed.len() < raw.len() {
+            return Ok((METHOD_DEFLATE, packed));
+        }
+    }
+    Ok((METHOD_STORE, raw.to_vec()))
 }
 
 /// 把 0–9 的通用级别映射成 deflate 级别（0 = 存储，由调用方单独处理）。

@@ -907,6 +907,7 @@ dependencies = [
  "encoding_rs",
  "flate2",
  "hmac",
+ "libc",
  "liblzma",
  "memmap2",
  "pbkdf2",

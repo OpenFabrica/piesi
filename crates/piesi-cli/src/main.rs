@@ -134,6 +134,9 @@ enum Cmd {
         /// 文件名改成 Windows 安全名
         #[arg(long)]
         windows_safe: bool,
+        /// 「Mac 专用」：xattr / 资源分支 / Finder 信息写成 __MACOSX/._ AppleDouble 条目（只对 zip 生效）
+        #[arg(long)]
+        mac_metadata: bool,
         /// 线程数（默认 CPU 核数）
         #[arg(long, default_value_t = 0)]
         threads: usize,
@@ -321,7 +324,7 @@ fn main() -> anyhow::Result<()> {
                 eprintln!("警告：{w}");
             }
         }
-        Cmd::A { archive, paths, format, level, password, encrypt_names, keep_junk, windows_safe, threads, solid_mb, quiet } => {
+        Cmd::A { archive, paths, format, level, password, encrypt_names, keep_junk, windows_safe, mac_metadata, threads, solid_mb, quiet } => {
             anyhow::ensure!(!paths.is_empty(), "至少给一个要压缩的路径");
             let opts = CreateOptions {
                 format: pick_format(format.as_deref(), &archive)?,
@@ -330,6 +333,7 @@ fn main() -> anyhow::Result<()> {
                 encrypt_names,
                 skip_junk: !keep_junk,
                 windows_safe,
+                mac_metadata,
                 threads,
                 solid_block_bytes: solid_mb * 1024 * 1024,
             };

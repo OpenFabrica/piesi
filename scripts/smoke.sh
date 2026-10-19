@@ -3,9 +3,12 @@
 # 用法：scripts/smoke.sh（需要 /opt/homebrew/bin/7zz）
 set -euo pipefail
 cd "$(dirname "$0")/.."
-PIESI=${PIESI:-$(pwd)/target/smoke/release/piesi}
 SEVENZ=${SEVENZ:-/opt/homebrew/bin/7zz}
-[ -x "$PIESI" ] || CARGO_TARGET_DIR=target/smoke cargo build --release -p piesi-cli -q
+# 没有显式指定 PIESI 就每次都构建（增量构建很快），免得拿上一次的旧二进制测新代码
+if [ -z "${PIESI:-}" ]; then
+  CARGO_TARGET_DIR=target/smoke cargo build --release -p piesi-cli -q
+  PIESI=$(pwd)/target/smoke/release/piesi
+fi
 T=$(mktemp -d /tmp/piesi-smoke.XXXXXX)
 trap 'rm -rf "$T"' EXIT
 SRC="$T/源目录 测试"
@@ -104,4 +107,39 @@ d="$T/z-slip"; mkdir -p "$d"; "$PIESI" x -q -o "$d" "$T/slip.zip" 2>"$T/slip.err
 [ ! -e "$T/evil.txt" ] && [ ! -e "/abs.txt" ] || fail "zip-slip 逃逸成功"
 [ -f "$d/slip/ok/fine.txt" ] || [ -f "$d/ok/fine.txt" ] || fail "正常条目没解出"
 echo "  越界条目被拒绝，正常条目照常解出"
+
+echo "## 6. --mac-metadata：xattr / 资源分支 / Finder 信息 → __MACOSX/._ → ditto 还原"
+MSRC="$T/mac源"; mkdir -p "$MSRC/子目录"
+printf 'tagged\n' > "$MSRC/标签.txt"
+xattr -w com.example.k v "$MSRC/标签.txt"
+printf 'RSRC' > "$MSRC/标签.txt/..namedfork/rsrc"
+xattr -wx com.apple.FinderInfo "54455854 74747874 0400 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000" "$MSRC/标签.txt"
+xattr -w com.apple.quarantine "0083;00000000;Safari;X" "$MSRC/标签.txt"
+printf 'n\n' > "$MSRC/子目录/嵌套.txt"; xattr -w com.example.n nv "$MSRC/子目录/嵌套.txt"
+( cd "$T" && "$PIESI" a -q --mac-metadata mac.zip "mac源" )
+unzip -tqq "$T/mac.zip" || fail "unzip 校验 mac.zip"
+# unzip -l 会把中文名打成乱码，条目名和 ._ 内容用 zipfile 看
+python3 -I - "$T/mac.zip" <<'PY' || fail "Mac 专用包的 __MACOSX 条目检查"
+import sys, zipfile
+z = zipfile.ZipFile(sys.argv[1]); names = [i.filename for i in z.infolist()]
+assert '__MACOSX/mac源/._标签.txt' in names, names
+assert '__MACOSX/mac源/子目录/._嵌套.txt' in names, names
+assert names.index('__MACOSX/mac源/._标签.txt') == names.index('mac源/标签.txt') + 1, names
+ad = z.read('__MACOSX/mac源/._标签.txt')
+assert ad[:4] == b'\x00\x05\x16\x07' and ad[84:88] == b'ATTR', ad[:90]
+assert b'com.apple.quarantine' not in ad, "quarantine 进包了"
+assert b'com.example.k' in ad and ad.endswith(b'RSRC'), ad
+print("  __MACOSX/._ 条目", sum('/._' in n for n in names), "个，紧跟各自条目，含 xattr 与资源分支，不含 quarantine")
+PY
+d="$T/m-ditto"; mkdir -p "$d"; ditto -x -k "$T/mac.zip" "$d"
+[ "$(xattr -p com.example.k "$d/mac源/标签.txt")" = "v" ] || fail "ditto 解压后 xattr 没回来"
+[ "$(cat "$d/mac源/标签.txt/..namedfork/rsrc")" = "RSRC" ] || fail "ditto 解压后资源分支没回来"
+xattr -px com.apple.FinderInfo "$d/mac源/标签.txt" | head -1 | grep -q "^54 45 58 54 74 74 78 74 04 00" || fail "ditto 解压后 Finder 信息没回来"
+xattr -p com.apple.quarantine "$d/mac源/标签.txt" >/dev/null 2>&1 && fail "quarantine 被带过来了"
+[ "$(xattr -p com.example.n "$d/mac源/子目录/嵌套.txt")" = "nv" ] || fail "嵌套文件的 xattr 没回来"
+[ ! -e "$d/__MACOSX" ] || fail "ditto 没有吃掉 __MACOSX"
+d="$T/m-piesi"; mkdir -p "$d"; "$PIESI" x -q -o "$d" "$T/mac.zip"
+[ ! -e "$d/mac源/__MACOSX" ] && [ ! -e "$d/__MACOSX" ] || fail "piesi 解自己的 Mac 专用包时没跳过 __MACOSX"
+diff -r "$MSRC" "$d/mac源" || fail "Mac 专用包解压内容与源不一致"
+echo "  __MACOSX/._ 条目位置正确、不含 quarantine；ditto 还原 xattr / 资源分支 / Finder 信息；piesi 解压时跳过"
 echo "全部通过"

@@ -29,6 +29,7 @@ unicode-normalization.workspace = true
 unicode-segmentation.workspace = true
 cap-std.workspace = true
 xattr.workspace = true
+libc.workspace = true
 memmap2.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
