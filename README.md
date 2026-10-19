@@ -17,6 +17,7 @@ piesi list 包.zip                   # 列目录，自动识别文件名编码�
 piesi list 包.zip --json            # 机器可读输出（含 id、编码置信度）
 piesi x 包.zip                      # 解压到包旁边，智能建文件夹、冲突改名、跳过 __MACOSX/.DS_Store
 piesi x 包.7z -o 目标目录 -p 密码    # 指定目录与密码；--id 3 --id 7 只解指定条目
+piesi t 包.zip                      # 校验（解码 + CRC，不写盘），损坏或密码错误时退出码非 0
 piesi a 输出.zip 目录 文件…          # 创建 zip（UTF-8 + bit 11 + NFC，多线程）
 piesi a 输出.7z --level 7 目录      # 创建 7z（多线程 LZMA2，solid 块 128 MB）
 piesi a 输出.tar.zst 目录           # tar.gz / tar.xz / tar.zst
