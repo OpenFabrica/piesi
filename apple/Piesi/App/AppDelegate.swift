@@ -19,8 +19,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var launchedForFiles = false
     private var finishedLaunching = false
     private var mainWindowController: MainWindowController?
+    /// Finder 右键「服务」的处理器；NSApp.servicesProvider 是强引用，这里留一份便于测试
+    private let servicesProvider = ServicesProvider()
 
     // MARK: 生命周期
+
+    /// 服务处理器要在收到服务请求前装好，放在 willFinish。
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSApp.servicesProvider = servicesProvider
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         finishedLaunching = true
@@ -38,7 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showMainWindow()
         }
         NSApp.activate()
-        openQueue.start()
+        // 首次启动只问「设为默认解压工具」这一件事（设计 6.3），问完再处理排队的文件
+        Task { @MainActor in
+            await DefaultHandler.askOnFirstLaunch(settings: settings)
+            openQueue.start()
+        }
     }
 
     /// Finder 双击 / 拖到 Dock / open 命令。⌥ 双击 = 浏览（设计 6.3）；open 事件不带按键，读当前硬件修饰键。

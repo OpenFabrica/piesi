@@ -70,6 +70,62 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Finder 右键「服务」（设计 6.4）：方法名对应 ServicesProvider 里的 @objc 方法；NSPortName 必须是 app 名 -->
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>用 Piesi 解压到此处</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>extractHereWithPiesi</string>
+			<key>NSPortName</key>
+			<string>Piesi</string>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.zip-archive</string>
+				<string>org.7-zip.7-zip-archive</string>
+				<string>com.rarlab.rar-archive</string>
+				<string>public.tar-archive</string>
+				<string>org.gnu.gnu-zip-archive</string>
+				<string>org.gnu.gnu-zip-tar-archive</string>
+				<string>public.bzip2-archive</string>
+				<string>public.tar-bzip2-archive</string>
+				<string>org.tukaani.xz-archive</string>
+				<string>org.tukaani.tar-xz-archive</string>
+				<string>org.zstd.zstd-archive</string>
+				<string>com.facebook.zstandard-archive</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>用 Piesi 查看</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>browseWithPiesi</string>
+			<key>NSPortName</key>
+			<string>Piesi</string>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.zip-archive</string>
+				<string>org.7-zip.7-zip-archive</string>
+				<string>com.rarlab.rar-archive</string>
+				<string>public.tar-archive</string>
+				<string>org.gnu.gnu-zip-archive</string>
+				<string>org.gnu.gnu-zip-tar-archive</string>
+				<string>public.bzip2-archive</string>
+				<string>public.tar-bzip2-archive</string>
+				<string>org.tukaani.xz-archive</string>
+				<string>org.tukaani.tar-xz-archive</string>
+				<string>org.zstd.zstd-archive</string>
+				<string>com.facebook.zstandard-archive</string>
+			</array>
+		</dict>
+	</array>
 	<!-- 7z/rar/zst 三个类型都导入兜底（导入声明只在没有别的导出声明时生效）：
 	     7z 系统 CoreTypes 声明为 org.7-zip.7-zip-archive（Keka/BetterZip 也用这个），rar 和 zst 系统没声明。 -->
 	<key>UTImportedTypeDeclarations</key>
