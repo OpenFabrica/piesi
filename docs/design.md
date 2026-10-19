@@ -29,7 +29,7 @@
 | WinRAR 6.x（中文 Windows） | GBK | 没设，但带 0x7075 UTF-8 扩展字段 | macOS 归档工具按 UTF-8 读 → 乱码或报错 |
 | 现代工具（7-Zip 新版等） | UTF-8 | 设了（0x808） | 两边都正常 |
 
-结论：写 ZIP 时「UTF-8 + 设 bit 11 + NFC 归一化」就能让 Windows 正常显示；读 ZIP 时「bit 11 → 0x7075 → 合法 UTF-8 → 候选解码打分」四级判断能覆盖绝大多数来源。P0 要在 macOS 26 上用 `ditto` 再复核一次 Finder 仍不写 bit 11（本机样本可能来自旧系统）。
+结论：写 ZIP 时「UTF-8 + 设 bit 11 + NFC 归一化」就能让 Windows 正常显示；读 ZIP 时「bit 11 → 0x7075 → 合法 UTF-8 → 候选解码打分」四级判断能覆盖绝大多数来源。已在 macOS 27.0.1 上用 `ditto -c -k` 复核（2026-10-19）：文件名是 UTF-8 但 bit 11 仍不设（made by = Unix/2.1，扩展字段只有 0x5855），还会给每个文件塞 `._*` AppleDouble；系统自带 Info-ZIP zip 3.0 同样不设 bit 11。
 
 ### 2.3 技术底座可用性（已核实）
 
@@ -249,7 +249,7 @@ Piesi/
    - **兼容语料先过，再谈速度**：收集 7-Zip 9.20/16/23/24、WinRAR 6/7、Bandizip、Finder/ditto、Info-ZIP 产出的包：BCJ/BCJ2/ARM64/Delta/PPMd、头加密、空文件/anti-item、>4 GB、10 万条目、symlink/unix 属性、solid/非 solid、`.001` 与 `.z01` 分卷、GBK/Big5/Shift_JIS/EUC-KR/CP1251 文件名。`piesi-cli` 跑 manifest 全过。
    - **基准**：1 GB 混合目录 + 单个 2 GB 文件，liblzma 分块并行 vs `7zz` vs lzma-rust2，**压缩和解压都测**，记耗时与峰值内存（`/usr/bin/time -l`）。结果见第 12 节。
    - UniFFI 打通到一个空 SwiftUI 窗口：进度回调节流 + 取消令牌 + 单层目录拉取。
-   - macOS 26 上复核 Finder/ditto 不写 bit 11（`ditto -c -k` 后用 Python 读 `flag_bits`）。
+   - macOS 26 上复核 Finder/ditto 不写 bit 11（`ditto -c -k` 后用 Python 读 `flag_bits`）。已做，结果见 2.2。
 2. **P1 MVP（4–6 周）**：zip（自写 reader）/7z/rar/tar 解压、zip/7z 创建、浏览窗口（NSOutlineView）、编码识别 + 常驻选择器、干净默认、cap-std 与 quarantine、255 字节名、分卷、默认处理器、Services、CLI、签名公证、内测。
 3. **P2 打磨（约 4 周）**：加密、Quick Look 扩展、App Intents、预设、任务队列、本地化、CI 与 Release 流程，发 1.0。
 4. **P3**：Overlay 编辑、修复、bsdtar 长尾兜底、MAS 版、Windows 版。
@@ -306,3 +306,7 @@ Piesi/
 | mx9 | 256 MB | 256 MB |
 
 规则就是 7-Zip Lzma2Enc 的：块 = clamp(4 × 字典, 1 MB, 256 MB)；`-mmt1` 时不分块。piesi 的字典表改成和它一致（1→256 KB，3→4 MB，5→32 MB，7→128 MB，9→256 MB，偶数档取中间值），块按同一规则算。
+
+### 其他 P0 指标
+- 10 万条目的 zip 打开并列出全部条目：piesi 0.10 s，7zz 0.24 s（目标 < 200 ms，达标；`--json` 输出 0.58 s 是序列化开销）。
+- ditto / Finder 不写 bit 11 的复核：见 2.2。
