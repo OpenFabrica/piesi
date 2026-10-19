@@ -4,6 +4,9 @@
 #   APPLE_SIGN_IDENTITY   签名身份（默认 Developer ID Application: Jiangwei Lan (HQ537XMLJY)）
 #   APPLE_NOTARY_PROFILE  notarytool 的 keychain profile（默认 aster-notary）
 #   SKIP_NOTARIZE=1       只签名不公证（本地测试包）
+#   RELEASE=1             发版门禁（docs/release.md 第 6 条）：拒绝开发标记、版本与标签不一致、未提交改动
+#   APPLE_NOTARY_KEY      CI 用 App Store Connect API Key 公证：.p8 路径，另需 APPLE_NOTARY_KEY_ID、APPLE_NOTARY_ISSUER；
+#                         设了就不经钥匙串 profile
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
@@ -26,6 +29,18 @@ case "$RUST_VER" in
   *) PKG_VER="$RUST_VER" ;;
 esac
 echo "打包版本：${PKG_VER}（签名：${IDENTITY}）"
+
+# 发版门禁：任一不过就停。本地打测试包（不设 RELEASE）不走这里。
+if [ "${RELEASE:-0}" = "1" ]; then
+  case "$RUST_VER" in *-dev*) echo "发版包不能带开发标记：${RUST_VER}" >&2; exit 1 ;; esac
+  TAG="${GITHUB_REF_NAME:-$(git describe --tags --exact-match 2>/dev/null || true)}"
+  [ "$TAG" = "v$RUST_VER" ] || { echo "标签「${TAG}」与版本 v${RUST_VER} 不一致" >&2; exit 1; }
+  [ -z "$DIRTY" ] || { echo "有未提交改动，不能发版" >&2; exit 1; }
+  # 标签必须在主分支上（CI 里 origin/main 存在时才查）
+  if git rev-parse --verify -q origin/main >/dev/null 2>&1; then
+    git merge-base --is-ancestor "$TAG" origin/main || { echo "标签 ${TAG} 不在 origin/main 上" >&2; exit 1; }
+  fi
+fi
 
 scripts/build-core.sh
 ( cd apple && xcodegen generate )
@@ -53,7 +68,13 @@ rm -rf "$STAGE"
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 
 if [ "${SKIP_NOTARIZE:-0}" != "1" ]; then
-  xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
+  if [ -n "${APPLE_NOTARY_KEY:-}" ]; then
+    # CI：App Store Connect API Key（.p8 文件 + key id + issuer），runner 上没有钥匙串 profile
+    xcrun notarytool submit "$DMG" --key "$APPLE_NOTARY_KEY" --key-id "${APPLE_NOTARY_KEY_ID:?缺 APPLE_NOTARY_KEY_ID}" \
+      --issuer "${APPLE_NOTARY_ISSUER:?缺 APPLE_NOTARY_ISSUER}" --wait
+  else
+    xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
+  fi
   xcrun stapler staple "$DMG"
   xcrun stapler validate "$DMG"
   spctl -a -t open --context context:primary-signature -vv "$DMG"

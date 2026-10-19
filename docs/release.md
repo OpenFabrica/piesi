@@ -14,6 +14,7 @@
    2. `CHANGELOG.md` 顶上加 `## <版本> · <日期> · <渠道>`，渠道是 `alpha` / `beta` / `rc` / `stable`。
       更新日志手写，面向用户，一行一条。先按上个标签以来的 `git log` 起草，给用户看过再定稿。
    3. 提交 `chore(release): <版本>`，打注释标签 `v<版本>`，推送分支和标签。
+      标签推上 GitHub 后，`.github/workflows/release.yml` 自动跑 `scripts/package.sh`（门禁 → 通用二进制 → Developer ID 签名 → 公证 → DMG 传到 Release）；需要的 Secrets 写在该文件开头的注释里。
    4. **标签推出去后，马上再做一个提交，把版本号推到下一个开发版，并推送。**
       默认补丁号加一（`0.1.0` → `0.1.1-dev`）；预发布串把最后一个数字加一（`0.1.0-alpha.2` → `0.1.0-alpha.3-dev`）。
       用户说了要升次版本号或主版本号，才按用户说的改。提交信息 `chore(release): 开始 <下一个版本>`，不打标签。
