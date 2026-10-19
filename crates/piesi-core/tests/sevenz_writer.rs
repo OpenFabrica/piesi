@@ -1,6 +1,6 @@
 //! 7z 写入器集成测试：多 solid 块并行、加密与文件名加密，用自己的读取器回读；有 7zz 时再交叉校验。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use piesi_core::archive::{Entry, EntrySink, PasswordNeed};
 use piesi_core::create::{create_archive, CreateFormat, CreateOptions};
@@ -66,7 +66,7 @@ fn make_tree(tag: &str) -> (PathBuf, PathBuf, Vec<(String, Vec<u8>)>) {
 }
 
 /// 回读并逐文件校验 CRC。
-fn verify(out: &PathBuf, password: Option<&str>, files: &[(String, Vec<u8>)]) {
+fn verify(out: &Path, password: Option<&str>, files: &[(String, Vec<u8>)]) {
     let mut reader = piesi_core::open(out).unwrap();
     if let Some(pw) = password {
         assert_ne!(reader.needs_password(), PasswordNeed::None);
@@ -91,7 +91,7 @@ fn parallel_solid_blocks_roundtrip() {
     let (work, src, files) = make_tree("plain");
     let out = work.join("out.7z");
     let opts = CreateOptions { format: CreateFormat::SevenZ, level: 5, solid_block_bytes: 200 * 1024, threads: 4, ..Default::default() };
-    let report = create_archive(&out, &[src.clone()], &opts, &OpContext::silent()).unwrap();
+    let report = create_archive(&out, std::slice::from_ref(&src), &opts, &OpContext::silent()).unwrap();
     assert!(report.output_bytes < report.input_bytes * 6 / 10, "{} / {}", report.output_bytes, report.input_bytes);
     verify(&out, None, &files);
     if let Ok(status) = std::process::Command::new("/opt/homebrew/bin/7zz").args(["t", "-bso0", "-bsp0"]).arg(&out).status() {
@@ -113,7 +113,7 @@ fn encrypted_with_header_roundtrip() {
         encrypt_names: true,
         ..Default::default()
     };
-    create_archive(&out, &[src.clone()], &opts, &OpContext::silent()).unwrap();
+    create_archive(&out, std::slice::from_ref(&src), &opts, &OpContext::silent()).unwrap();
     let reader = piesi_core::open(&out).unwrap();
     assert_eq!(reader.needs_password(), PasswordNeed::ForNames, "文件名应已加密");
     assert!(reader.entries().is_empty());

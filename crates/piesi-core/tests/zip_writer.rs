@@ -75,7 +75,7 @@ fn spill_store_and_memory_paths_roundtrip() {
 
     let out = work.join("out.zip");
     let opts = CreateOptions { format: CreateFormat::Zip, level: 5, ..Default::default() };
-    let report = create_archive(&out, &[src.clone()], &opts, &OpContext::silent()).unwrap();
+    let report = create_archive(&out, std::slice::from_ref(&src), &opts, &OpContext::silent()).unwrap();
     assert_eq!(report.skipped_junk, 1);
     assert!(report.output_bytes < report.input_bytes / 2, "65 MB 规律数据应明显压缩：{} / {}", report.output_bytes, report.input_bytes);
     // 临时文件必须已清理
