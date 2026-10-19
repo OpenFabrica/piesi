@@ -333,3 +333,4 @@ Piesi/
 - `fuzz/` 工程（libFuzzer，目标 open_any：打开 → 列目录 → 规划 → 校验）首轮 2 分钟就抓到 .xz 头声明 4 GB 字典的 OOM：tar.xz 与 zip 方法 95 的解码器都加了内存上限（物理内存 / 2，夹在 256 MB–2 GB）。
 - zip 条目的 LZMA / LZMA2 字典按条目大小收紧，7z 的 LZMA1 / LZMA2 字典按 folder 大小收紧；PPMd 内存只能封顶。
 - 样本存 `fuzz/regressions/`，`cargo test` 逐个回放（不 panic、5 秒内结束）。
+- liblzma 合并后的树（a7228f9 之后）跑 15 分钟：256 万次执行、覆盖 1.3 万条边，无崩溃、无超时、无 OOM。
