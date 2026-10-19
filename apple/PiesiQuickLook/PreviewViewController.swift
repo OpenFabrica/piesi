@@ -61,11 +61,11 @@ final class PreviewViewController: NSViewController, QLPreviewingController, NSO
 
         header.font = .systemFont(ofSize: 13, weight: .medium)
         header.textColor = .secondaryLabelColor
-        header.stringValue = "正在读取…"
+        header.stringValue = String(localized: "正在读取…")
         header.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(header)
 
-        for (id, title, width, alignment) in [("name", "名称", 360.0, NSTextAlignment.left), ("size", "大小", 90.0, .right), ("mtime", "修改时间", 130.0, .left)] {
+        for (id, title, width, alignment) in [("name", String(localized: "名称"), 360.0, NSTextAlignment.left), ("size", String(localized: "大小"), 90.0, .right), ("mtime", String(localized: "修改时间"), 130.0, .left)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
@@ -130,26 +130,26 @@ final class PreviewViewController: NSViewController, QLPreviewingController, NSO
             }
             logger.notice("preview \(url.lastPathComponent, privacy: .public): \(loaded.format, privacy: .public) \(loaded.entryCount) 项")
         } catch {
-            header.stringValue = "无法读取压缩包：\(error.localizedDescription)"
+            header.stringValue = String(localized: "无法读取压缩包：\(error.localizedDescription)")
             logger.error("preview \(url.lastPathComponent, privacy: .public) failed: \(String(describing: error), privacy: .public)")
         }
     }
 
     /// 摘要行：「ZIP · 1,234 项 · 56.7 MB · 文件名编码 GBK（自动）」。
     private func summary(of loaded: LoadedArchive) -> String {
-        var parts = [loaded.format, "\(loaded.entryCount.formatted()) 项", sizeFormatter.string(fromByteCount: Int64(loaded.totalSize))]
+        var parts = [loaded.format, String(localized: "\(loaded.entryCount.formatted()) 项"), sizeFormatter.string(fromByteCount: Int64(loaded.totalSize))]
         switch loaded.password {
         case .forNames:
-            parts.append("文件名已加密，需要用 Piesi 打开并输入密码")
+            parts.append(String(localized: "文件名已加密，需要用 Piesi 打开并输入密码"))
         case .forData:
-            parts.append("内容已加密")
+            parts.append(String(localized: "内容已加密"))
         case .notNeeded:
             break
         }
         let enc = loaded.encoding
-        var label = "文件名编码 \(encodingLabel(enc.encoding))"
+        var label = String(localized: "文件名编码 \(encodingLabel(enc.encoding))")
         if enc.source != "manual" {
-            label += enc.ambiguous ? "（自动，不确定）" : "（自动）"
+            label += enc.ambiguous ? String(localized: "（自动，不确定）") : String(localized: "（自动）")
         }
         parts.append(label)
         return parts.joined(separator: " · ")
@@ -205,7 +205,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController, NSO
         let row = node.row
         switch column.identifier.rawValue {
         case "name":
-            cell.textField?.stringValue = row.name + (row.encrypted ? "  [加密]" : "")
+            cell.textField?.stringValue = row.name + (row.encrypted ? "  " + String(localized: "[加密]") : "")
             cell.imageView?.image = icon(for: row)
         case "size":
             cell.textField?.stringValue = row.kind == .file ? sizeText(row.size) : ""
@@ -220,7 +220,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController, NSO
 
     /// 大小列文字：ByteCountFormatter 对 0 会显示「0 KB」，这里统一成「0 字节」。
     private func sizeText(_ bytes: UInt64) -> String {
-        bytes == 0 ? "0 字节" : sizeFormatter.string(fromByteCount: Int64(bytes))
+        bytes == 0 ? String(localized: "0 字节") : sizeFormatter.string(fromByteCount: Int64(bytes))
     }
 
     /// 新建一个带图标 + 文字的单元格；makeView 复用时就不再走这里。

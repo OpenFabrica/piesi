@@ -8,6 +8,8 @@ options:
   xcodeVersion: "27.0"
   createIntermediateGroups: true
   groupSortPosition: top
+  # 开发语言简体中文：代码里的文案就是 zh-Hans 原文，Localizable.xcstrings 只放 zh-Hant / en / ja 的翻译
+  developmentLanguage: zh-Hans
 
 # 版本号只存 Config/Version.xcconfig 一处（docs/release.md 第 4 条）
 configFiles:
@@ -25,6 +27,8 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     # Info.plist 手写（放在各 target 目录），不让 Xcode 自动生成
     GENERATE_INFOPLIST_FILE: NO
+    # 本地化用字符串目录（.xcstrings），不用老的 .strings 文件
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
     # Rust 静态库里有 unrar_sys 编的 C++ 代码（RARLAB 的 unrar 源码），最终链接要带 libc++
     OTHER_LDFLAGS: -lc++
 
