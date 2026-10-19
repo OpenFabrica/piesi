@@ -280,6 +280,12 @@ impl ArchiveHandle {
         self.inner.lock().unwrap().entries().len() as u32
     }
 
+    /// 全部文件条目的原始大小之和（目录、链接不算），给摘要行用。
+    pub fn total_size(&self) -> u64 {
+        let a = self.inner.lock().unwrap();
+        a.entries().iter().filter(|e| e.kind == EntryKind::File).map(|e| e.size).sum()
+    }
+
     /// 当前编码识别结果。
     pub fn encoding_info(&self) -> EncodingInfo {
         let a = self.inner.lock().unwrap();
