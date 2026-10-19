@@ -164,5 +164,11 @@ diff -r --exclude=.DS_Store --exclude=__MACOSX "$SRC" "$d/源目录 测试" || f
 ( cd "$T" && "$SEVENZ" a -bso0 -tzip -pSECRET -mem=AES256 ref-enc.zip "源目录 测试" )
 d="$T/e-ref"; mkdir -p "$d"; "$PIESI" x -q -o "$d" -p SECRET "$T/ref-enc.zip"
 diff -r --exclude=.DS_Store --exclude=__MACOSX "$SRC" "$d/源目录 测试" || fail "7zz 建的 AES zip 解压不一致"
-echo "  AES zip 双向互通（piesi ↔ 7zz），错密码两边都拒绝"
+( cd "$T" && "$SEVENZ" a -bso0 -tzip -pSECRET -mem=ZipCrypto weak.zip "源目录 测试" )
+"$PIESI" list --json "$T/weak.zip" | python3 -I -c 'import sys, json; assert json.load(sys.stdin)["weak_encryption"] is True' || fail "ZipCrypto 包没标成弱加密"
+"$PIESI" list --json "$T/enc.zip" | python3 -I -c 'import sys, json; assert json.load(sys.stdin)["weak_encryption"] is False' || fail "AES 包被误标成弱加密"
+d="$T/e-weak"; mkdir -p "$d"; "$PIESI" x -o "$d" -p SECRET "$T/weak.zip" 2>"$T/weak.err" >/dev/null
+grep -q "ZipCrypto" "$T/weak.err" || fail "解 ZipCrypto 包时没有提示不安全"
+diff -r --exclude=.DS_Store --exclude=__MACOSX "$SRC" "$d/源目录 测试" || fail "ZipCrypto 包解压不一致"
+echo "  AES zip 双向互通（piesi ↔ 7zz），错密码两边都拒绝；ZipCrypto 包标为弱加密并提示，AES 包不标"
 echo "全部通过"

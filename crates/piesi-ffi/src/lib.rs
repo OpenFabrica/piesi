@@ -331,6 +331,11 @@ impl ArchiveHandle {
         }
     }
 
+    /// 是否有条目用的是弱加密（zip 的老式 ZipCrypto，已知可破解）。要密码时 UI 据此提示「这不安全，只能读」。
+    pub fn has_weak_encryption(&self) -> bool {
+        self.inner.lock().unwrap().has_weak_encryption()
+    }
+
     /// 设置密码。
     pub fn set_password(&self, password: Option<String>) -> Result<(), PiesiError> {
         self.inner.lock().unwrap().set_password(password.as_deref())?;

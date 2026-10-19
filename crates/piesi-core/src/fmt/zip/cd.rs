@@ -322,6 +322,8 @@ pub fn build_entry(
     entry.mtime = mtime;
     entry.crc32 = crc32;
     entry.encrypted = f.flags & 0x0001 != 0;
+    // 加密但既不是 AES（方法 99）也不是 PKWARE 强加密（bit 6）→ 老式 ZipCrypto，已知可破解
+    entry.weak_encryption = entry.encrypted && f.method != 99 && f.flags & 0x0040 == 0;
     entry.method = method;
     entry.unix_mode = unix_mode;
     Ok((entry, RawEntry { local_offset, flags: f.flags, method_raw: f.method, aes, host }))

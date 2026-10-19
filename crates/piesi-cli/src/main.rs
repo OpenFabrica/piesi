@@ -246,7 +246,7 @@ fn main() -> anyhow::Result<()> {
                     "{}",
                     serde_json::to_string_pretty(&serde_json::json!({
                         "format": archive.format().display_name(),
-                        "encoding": d.encoding, "confidence": d.confidence, "source": d.source, "ambiguous": d.ambiguous,
+                        "encoding": d.encoding, "confidence": d.confidence, "source": d.source, "ambiguous": d.ambiguous, "weak_encryption": archive.has_weak_encryption(),
                         "entries": rows,
                     }))?
                 );
@@ -267,6 +267,9 @@ fn main() -> anyhow::Result<()> {
             let mut archive = Archive::open_system(&path)?;
             if let Some(pw) = password.as_deref() {
                 archive.set_password(Some(pw))?;
+            }
+            if archive.has_weak_encryption() && !quiet {
+                eprintln!("警告：此包用的是老式 ZipCrypto 加密，已知可被破解；只能读取，建议重新用 AES 打包");
             }
             if let Some(enc) = encoding {
                 archive.set_encoding(enc.into());
@@ -306,6 +309,9 @@ fn main() -> anyhow::Result<()> {
             let mut archive = Archive::open_system(&path)?;
             if let Some(pw) = password.as_deref() {
                 archive.set_password(Some(pw))?;
+            }
+            if archive.has_weak_encryption() && !quiet {
+                eprintln!("警告：此包用的是老式 ZipCrypto 加密，已知可被破解；只能读取，建议重新用 AES 打包");
             }
             if let Some(enc) = encoding {
                 archive.set_encoding(enc.into());

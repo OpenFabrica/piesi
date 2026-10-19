@@ -115,6 +115,11 @@ impl Archive {
         self.reader.needs_password()
     }
 
+    /// 是否有条目用的是弱加密（zip 的老式 ZipCrypto，已知可破解）。要密码时 UI 据此提示「这不安全」。
+    pub fn has_weak_encryption(&self) -> bool {
+        self.entries().iter().any(|e| e.weak_encryption)
+    }
+
     /// 设置密码；头加密的包设完才有条目，所以随后重新识别编码。
     pub fn set_password(&mut self, password: Option<&str>) -> Result<()> {
         self.reader.set_password(password)?;

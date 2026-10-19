@@ -144,6 +144,7 @@ fn aes_entries() {
     for file in ["aes256.zip", "aes128.zip", "aes256_ae1.zip"] {
         let mut r = ZipReader::open(&fx(file)).unwrap();
         assert_eq!(r.needs_password(), PasswordNeed::ForData, "{file}");
+        assert!(r.entries().iter().all(|e| !e.weak_encryption), "{file}：AES 不是弱加密");
         let hello = entry(&r, "hello.txt");
         assert!(hello.encrypted);
         assert!(matches!(hello.method, Method::Store | Method::Deflate), "{file}: {:?}", hello.method);
@@ -194,6 +195,7 @@ fn aes_tamper_is_corrupt() {
 fn zipcrypto_entries() {
     let mut r = ZipReader::open(&fx("zipcrypto.zip")).unwrap();
     assert_eq!(r.needs_password(), PasswordNeed::ForData);
+    assert!(r.entries().iter().any(|e| e.encrypted && e.weak_encryption), "ZipCrypto 应标为弱加密");
     let mut sink = MemSink::default();
     assert!(matches!(r.extract(None, &mut sink, &OpContext::silent()), Err(Error::PasswordRequired)));
     r.set_password(Some("nope")).unwrap();

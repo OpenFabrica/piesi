@@ -124,6 +124,9 @@ pub struct Entry {
     pub mtime: Option<i64>,
     pub crc32: Option<u32>,
     pub encrypted: bool,
+    /// 加密方式已知可破解（zip 的老式 ZipCrypto）：UI 要密码时据此提示「这不安全」。AES zip、7z、rar 都是 false。
+    #[serde(default)]
+    pub weak_encryption: bool,
     pub method: Method,
     /// Unix 权限位（含类型位），zip 的 Unix 产物和 tar/7z 常有。
     pub unix_mode: Option<u32>,
@@ -147,6 +150,7 @@ impl Entry {
             mtime: None,
             crc32: None,
             encrypted: false,
+            weak_encryption: false,
             method: Method::Store,
             unix_mode: None,
             solid_group: None,
