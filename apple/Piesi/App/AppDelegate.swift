@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) lazy var tasksWindow = TasksWindowController(center: taskCenter)
     private(set) lazy var extractor = ExtractCoordinator(taskCenter: taskCenter, settings: settings, tasksWindow: tasksWindow)
     private(set) lazy var compressor = CompressCoordinator(taskCenter: taskCenter, settings: settings, tasksWindow: tasksWindow)
+    private lazy var settingsWindow = SettingsWindowController()
     private lazy var openQueue = OpenQueue { [weak self] request in
         await self?.handle(request)
     }
@@ -44,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if !launchedForFiles {
             showMainWindow()
+        }
+        if settings.showSettingsAtLaunch {
+            settingsWindow.show()
         }
         NSApp.activate()
         // 首次启动只问「设为默认解压工具」这一件事（设计 6.3），问完再处理排队的文件
@@ -153,6 +157,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 窗口菜单：显示任务浮窗。
     @objc func showTasksWindow(_ sender: Any?) {
         tasksWindow.show()
+    }
+
+    /// ⌘,：设置窗口。
+    @objc func showSettingsWindow(_ sender: Any?) {
+        settingsWindow.show()
     }
 
     // MARK: 处理队列

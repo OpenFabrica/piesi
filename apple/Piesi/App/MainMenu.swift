@@ -25,6 +25,8 @@ enum MainMenu {
         let menu = NSMenu(title: "Piesi")
         menu.addItem(withTitle: "关于 Piesi", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         menu.addItem(.separator())
+        menu.addItem(withTitle: "设置…", action: #selector(AppDelegate.showSettingsWindow(_:)), keyEquivalent: ",")
+        menu.addItem(.separator())
         let services = NSMenu(title: "服务")
         NSApp.servicesMenu = services
         menu.addItem(item("服务", submenu: services))

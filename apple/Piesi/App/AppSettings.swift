@@ -15,6 +15,8 @@ enum SettingsKey {
     static let didAskDefaultHandler = "didAskDefaultHandler"
     /// 隐藏启动参数 `-PiesiBrowse YES`：强制走浏览窗口，自动化测试 ⌥ 路径用
     static let forceBrowse = "PiesiBrowse"
+    /// 隐藏启动参数 `-PiesiShowSettings YES`：启动就开设置窗口，自动化测试用
+    static let showSettings = "PiesiShowSettings"
 }
 
 /// 双击压缩包的默认动作。
@@ -48,4 +50,5 @@ final class AppSettings {
     }
     /// 命令行 `-PiesiBrowse YES` 会进 NSArgumentDomain，这里直接读得到
     var forceBrowse: Bool { defaults.bool(forKey: SettingsKey.forceBrowse) }
+    var showSettingsAtLaunch: Bool { defaults.bool(forKey: SettingsKey.showSettings) }
 }
