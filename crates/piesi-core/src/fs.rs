@@ -9,6 +9,7 @@ use cap_std::ambient_authority;
 use cap_std::fs::{Dir, OpenOptions};
 
 use crate::archive::ExtractReport;
+use crate::warning::{Warning, WarningKind};
 use crate::{Error, Result};
 
 /// 落盘时要回写的元数据。
@@ -201,7 +202,7 @@ impl FileSink for DirSink {
         // 越界的链接直接跳过并记录，不做成普通文件：静默改类型反而更难排查
         if symlink_escapes(rel, target) {
             self.report.skipped += 1;
-            self.report.warnings.push(format!("跳过越出目标目录的符号链接：{rel} -> {}", String::from_utf8_lossy(target)));
+            self.report.warnings.push(Warning::with_detail(WarningKind::SymlinkEscapeSkipped, rel, String::from_utf8_lossy(target)));
             return Ok(());
         }
         self.pending_links.push((rel.to_owned(), target.to_vec(), *meta));
@@ -224,7 +225,7 @@ impl FileSink for DirSink {
                 }
                 Err(e) => {
                     self.report.skipped += 1;
-                    self.report.warnings.push(format!("创建符号链接失败：{rel} -> {target_str}：{e}"));
+                    self.report.warnings.push(Warning::with_detail(WarningKind::SymlinkCreateFailed, rel, e.to_string()));
                 }
             }
         }

@@ -7,6 +7,7 @@ use crate::archive::EntryKind;
 use crate::encoding::normalize_for_write;
 use crate::names;
 use crate::progress::OpContext;
+use crate::warning::{Warning, WarningKind};
 use crate::{Error, Result};
 
 /// 可创建的格式。
@@ -89,7 +90,7 @@ pub struct Sources {
     pub items: Vec<SourceItem>,
     pub total_bytes: u64,
     pub skipped_junk: u64,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
 }
 
 /// 遍历给定的根路径（文件或目录），生成包内条目列表。
@@ -148,22 +149,22 @@ fn walk(path: &Path, rel: &str, opts: &CreateOptions, out: &mut Sources) -> Resu
         out.total_bytes += meta.len();
         out.items.push(SourceItem { rel, path: path.to_path_buf(), kind: EntryKind::File, size: meta.len(), mtime, mode, link_target: None });
     } else {
-        out.warnings.push(format!("跳过特殊文件：{}", path.display()));
+        out.warnings.push(Warning::new(WarningKind::SpecialFileSkipped, path.display().to_string()));
     }
     Ok(())
 }
 
 /// 包内路径定稿：NFC 归一化；「发给 Windows」时逐段改成安全名并记录改动。
-fn finalize_rel(rel: &str, opts: &CreateOptions, warnings: &mut Vec<String>) -> String {
+fn finalize_rel(rel: &str, opts: &CreateOptions, warnings: &mut Vec<Warning>) -> String {
     let nfc = normalize_for_write(rel);
     if !opts.windows_safe {
         return nfc;
     }
     let mut parts = Vec::new();
     for comp in nfc.split('/') {
-        let (safe, warns) = names::windows_safe_name(comp);
+        let (safe, _reasons) = names::windows_safe_name(comp);
         if safe != comp {
-            warnings.push(format!("已改名以兼容 Windows：{comp} → {safe}（{}）", warns.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>().join("，")));
+            warnings.push(Warning::with_detail(WarningKind::RenamedForWindows, comp, safe.clone()));
         }
         parts.push(safe);
     }
@@ -177,7 +178,7 @@ pub struct CreateReport {
     pub input_bytes: u64,
     pub output_bytes: u64,
     pub skipped_junk: u64,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
 }
 
 /// 创建压缩包。`dest` 已存在会被覆盖（调用方负责确认）。

@@ -16,6 +16,7 @@ use crate::create::apple_double;
 use crate::create::{CreateOptions, SourceItem, Sources};
 use crate::fmt::zip::aes as zipaes;
 use crate::progress::{OpContext, Throttle};
+use crate::warning::{Warning, WarningKind};
 use crate::{Error, Result};
 
 const SIG_LOCAL: u32 = 0x0403_4b50;
@@ -92,7 +93,7 @@ struct CentralRecord {
 }
 
 /// 写出一个 ZIP，返回写入过程中产生的 warning（目前只有 Mac 元数据读取/跳过的提示）。
-pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpContext<'_>) -> Result<Vec<String>> {
+pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpContext<'_>) -> Result<Vec<Warning>> {
     let threads = if opts.threads == 0 { std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4) } else { opts.threads };
     let level = Compression::new(zip_level(opts.level));
     // 编码参数：级别 0 = 存储；有密码 = 每个文件 / 链接 / AppleDouble 条目都 AES-256 加密（目录条目没有数据，不加密）
@@ -102,9 +103,9 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
     let mut out = CountingWriter { inner: BufWriter::with_capacity(1 << 20, file), offset: 0 };
     let mut throttle = Throttle::new(ctx, Some(sources.total_bytes), Some(sources.items.len() as u64));
     let mut records: Vec<CentralRecord> = Vec::with_capacity(sources.items.len());
-    let mut warnings: Vec<String> = Vec::new();
+    let mut warnings: Vec<Warning> = Vec::new();
     if enc.password.is_some() && opts.encrypt_names {
-        warnings.push("zip 不能加密文件名（只有 7z 可以），文件名未加密".into());
+        warnings.push(Warning::bare(WarningKind::ZipCannotEncryptNames));
     }
 
     // 并行压缩：worker 池按 index 乱序产出，主线程用 BTreeMap 按序回收后顺序写入。
@@ -250,11 +251,11 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
 /// 「Mac 专用」：读 item 的 Finder 信息、扩展属性、资源分支，打成 AppleDouble 写成
 /// `__MACOSX/<同目录>/._<名字>` 条目，紧跟在 item 自己的条目后面；没有元数据就什么都不写。
 /// 读元数据失败只记 warning 不中断——丢一个文件的标签不值得让整个包失败。符号链接由调用方跳过。
-fn write_apple_double(out: &mut CountingWriter, records: &mut Vec<CentralRecord>, item: &SourceItem, macosx_dirs: &mut BTreeSet<String>, enc: EncodeOpts<'_>, warnings: &mut Vec<String>) -> Result<()> {
+fn write_apple_double(out: &mut CountingWriter, records: &mut Vec<CentralRecord>, item: &SourceItem, macosx_dirs: &mut BTreeSet<String>, enc: EncodeOpts<'_>, warnings: &mut Vec<Warning>) -> Result<()> {
     let meta = match apple_double::read(&item.path, warnings) {
         Ok(m) => m,
         Err(e) => {
-            warnings.push(format!("读取 Mac 元数据失败，已跳过：{}：{e}", item.path.display()));
+            warnings.push(Warning::with_detail(WarningKind::MacMetadataReadFailed, item.path.display().to_string(), e.to_string()));
             return Ok(());
         }
     };

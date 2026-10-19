@@ -16,6 +16,7 @@ use unrar_sys as sys;
 use super::tar::{progress_name, selection_mask, CountingReader, WriterSink};
 use crate::archive::{ArchiveReader, Entry, EntryId, EntryKind, EntrySink, ExtractReport, Format, Method, PasswordNeed};
 use crate::progress::{CancelToken, OpContext, Throttle};
+use crate::warning::{Warning, WarningKind};
 use crate::{Error, Result};
 
 /// 回调里把 unrar 吐出的数据切成这么大的块再过通道，限制通道占用的内存。
@@ -286,15 +287,15 @@ fn consume(rx: &Receiver<Msg>, entries: &[Entry], kinds: &[RarKind], sink: &mut 
                         report.extracted += 1;
                     }
                     RarKind::HardLink => {
-                        report.warnings.push(format!("{}：硬链接暂不支持，已跳过", progress_name(entry)));
+                        report.warnings.push(Warning::new(WarningKind::HardLinkSkipped, progress_name(entry)));
                         report.skipped += 1;
                     }
                     RarKind::FileCopy => {
-                        report.warnings.push(format!("{}：引用记录（rar -oi）暂不支持，已跳过", progress_name(entry)));
+                        report.warnings.push(Warning::new(WarningKind::RarReferenceSkipped, progress_name(entry)));
                         report.skipped += 1;
                     }
                     RarKind::Regular | RarKind::SymlinkData => {
-                        report.warnings.push(format!("{}：条目没有数据，已跳过", progress_name(entry)));
+                        report.warnings.push(Warning::new(WarningKind::NoDataSkipped, progress_name(entry)));
                         report.skipped += 1;
                     }
                 }
@@ -308,7 +309,7 @@ fn consume(rx: &Receiver<Msg>, entries: &[Entry], kinds: &[RarKind], sink: &mut 
                         report.extracted += 1;
                     }
                     None => {
-                        report.warnings.push(format!("{}：unrar 拒绝还原该符号链接（目标不安全或读取失败），已跳过", progress_name(entry)));
+                        report.warnings.push(Warning::new(WarningKind::RarSymlinkRejected, progress_name(entry)));
                         report.skipped += 1;
                     }
                 }
@@ -333,7 +334,7 @@ fn consume(rx: &Receiver<Msg>, entries: &[Entry], kinds: &[RarKind], sink: &mut 
             Msg::End(..) => return Err(Error::Other("unrar 工作线程消息乱序".into())),
             Msg::Warning(i, code) => {
                 let name = entries.get(i).map(progress_name).unwrap_or_default();
-                report.warnings.push(format!("{name}：跳过时解码出错（{code:?}），未选中，忽略"));
+                report.warnings.push(Warning::with_detail(WarningKind::RarSkipDecodeError, name, format!("{code:?}")));
             }
             // 跳过的字节也算进度，同时充当取消检查点
             Msg::Skipped(n) => throttle.add_bytes(n)?,

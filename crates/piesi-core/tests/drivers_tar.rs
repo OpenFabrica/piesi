@@ -7,7 +7,7 @@ use common::*;
 use piesi_core::archive::{EntryKind, Format, IndexState, Method};
 use piesi_core::fmt::tar::TarReader;
 use piesi_core::progress::OpContext;
-use piesi_core::{ArchiveReader, Error};
+use piesi_core::{ArchiveReader, Error, WarningKind};
 
 /// 打开夹具。
 fn open(name: &str, format: Format) -> TarReader {
@@ -108,7 +108,7 @@ fn hardlink_is_skipped_with_warning() {
     assert_eq!(report.skipped, 1);
     assert_eq!(report.extracted, 1);
     assert_eq!(report.warnings.len(), 1);
-    assert!(report.warnings[0].contains("硬链接"), "{:?}", report.warnings);
+    assert_eq!(report.warnings[0].kind, WarningKind::HardLinkSkipped, "{:?}", report.warnings);
 }
 
 /// GBK 编码的文件名原样透传：raw_name 就是 GBK 字节，不标 UTF-8。

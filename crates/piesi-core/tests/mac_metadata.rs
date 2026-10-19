@@ -8,6 +8,7 @@ use std::process::Command;
 use piesi_core::create::{create_archive, CreateFormat, CreateOptions};
 use piesi_core::names;
 use piesi_core::progress::OpContext;
+use piesi_core::{Warning, WarningKind};
 
 const K_NAME: &str = "com.example.k";
 const TAGS_NAME: &str = "com.apple.metadata:_kMDItemUserTags";
@@ -65,7 +66,7 @@ fn make_sources(src: &Path, with_quarantine: bool) {
 }
 
 /// 用 piesi 打包（根是 f.txt、dir、emptydir、link 四个），返回包路径与 warning。
-fn pack(work: &Path, src: &Path, mac_metadata: bool) -> (PathBuf, Vec<String>) {
+fn pack(work: &Path, src: &Path, mac_metadata: bool) -> (PathBuf, Vec<Warning>) {
     let out = work.join(if mac_metadata { "mac.zip" } else { "plain.zip" });
     let opts = CreateOptions { format: CreateFormat::Zip, level: 5, mac_metadata, ..Default::default() };
     let roots = ["f.txt", "dir", "emptydir", "link"].map(|n| src.join(n));
@@ -222,7 +223,8 @@ fn oversize_fork_is_skipped_with_warning() {
     let opts = CreateOptions { format: CreateFormat::Zip, level: 1, mac_metadata: true, ..Default::default() };
     let report = create_archive(&out, std::slice::from_ref(&f), &opts, &OpContext::silent()).unwrap();
     assert_eq!(report.warnings.len(), 1, "{:?}", report.warnings);
-    assert!(report.warnings[0].contains("资源分支") && report.warnings[0].contains("64 MB"), "{}", report.warnings[0]);
+    assert_eq!(report.warnings[0].kind, WarningKind::MacResourceForkTooLarge, "{}", report.warnings[0]);
+    assert!(report.warnings[0].subject.ends_with("huge.bin"), "{}", report.warnings[0].subject);
     let ad = unzip_entry(&out, "__MACOSX/._huge.bin");
     assert_eq!(be32(&ad, 46), 0, "资源分支长度应为 0");
     assert!(String::from_utf8_lossy(&ad).contains(K_NAME));

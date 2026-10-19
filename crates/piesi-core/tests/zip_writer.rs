@@ -7,6 +7,7 @@ use std::process::Command;
 use piesi_core::archive::{Entry, EntryKind, EntrySink, Method, PasswordNeed};
 use piesi_core::create::{create_archive, CreateFormat, CreateOptions};
 use piesi_core::progress::OpContext;
+use piesi_core::WarningKind;
 
 /// 把条目内容收进内存并算 CRC 的 sink。
 #[derive(Default)]
@@ -142,6 +143,7 @@ fn aes_encrypted_roundtrip() {
     let opts = CreateOptions { format: CreateFormat::Zip, level: 5, password: Some(password.into()), encrypt_names: true, ..Default::default() };
     let report = create_archive(&out, std::slice::from_ref(&src), &opts, &OpContext::silent()).unwrap();
     assert_eq!(report.warnings.len(), 1, "encrypt_names 对 zip 无效应有提示：{:?}", report.warnings);
+    assert_eq!(report.warnings[0].kind, WarningKind::ZipCannotEncryptNames);
 
     let mut reader = piesi_core::open(&out).unwrap();
     assert_ne!(reader.needs_password(), PasswordNeed::None);
