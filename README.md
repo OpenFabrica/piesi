@@ -36,3 +36,15 @@ scripts/smoke.sh                  # 端到端：与 7zz / unzip / bsdtar 交叉�
 scripts/bench.sh mixed            # 与 7zz 对比耗时与峰值内存（结果在 bench/results.md）
 scripts/build-core.sh --arch native && (cd apple && xcodegen generate && xcodebuild -scheme Piesi build)
 ```
+
+### 模糊测试（cargo-fuzz）
+
+解析不可信压缩包是主要攻击面，`fuzz/` 里是 libFuzzer 目标 `open_any`：任意字节当压缩包打开、列目录、规划、校验，只允许报错，不允许 panic / 死循环 / 吃光内存。
+
+```sh
+cargo install cargo-fuzz          # 一次
+fuzz/seed.sh                      # 用测试夹具生成种子语料
+cargo +nightly fuzz run open_any -- -max_len=65536 -timeout=10 -rss_limit_mb=2048
+```
+
+发现的崩溃样本在 `fuzz/artifacts/open_any/`，复现：`cargo +nightly fuzz run open_any fuzz/artifacts/open_any/<文件>`。

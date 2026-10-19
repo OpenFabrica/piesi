@@ -1,0 +1,24 @@
+# fuzz/Cargo.toml —— cargo-fuzz 工程（libFuzzer）。独立 workspace，用 nightly 单独编；根 workspace 不用加 exclude。
+# 用法见 README「模糊测试」。
+[package]
+name = "piesi-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+piesi-core = { path = "../crates/piesi-core" }
+
+[[bin]]
+name = "open_any"
+path = "fuzz_targets/open_any.rs"
+test = false
+doc = false
+bench = false
+
+# 单独成一个 workspace，不进根 workspace（根 Cargo.lock 不受影响）
+[workspace]
