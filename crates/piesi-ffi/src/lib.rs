@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use piesi_core::create::CreateOptions;
 use piesi_core::encoding::NameEncoding;
 use piesi_core::facade::Archive;
 use piesi_core::plan::{ConflictPolicy, ExtractOptions};
@@ -149,6 +150,7 @@ pub enum Conflict {
 /// 解压选项。
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ExtractRequest {
+    /// 目标目录；空 = 压缩包所在目录
     pub dest: String,
     pub smart_folder: bool,
     pub conflict: Conflict,
@@ -165,6 +167,23 @@ pub struct ExtractResult {
     pub skipped: u64,
     pub skipped_junk: u64,
     pub warnings: Vec<String>,
+}
+
+/// 解压前的计划摘要：给确认对话框、磁盘空间预检、压缩炸弹预警用，不落盘。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct ExtractPlanInfo {
+    /// 实际落盘的根目录（智能建文件夹时是 dest/<压缩包名>）
+    pub root: String,
+    /// 计划解出的条目数
+    pub entries: u64,
+    /// 展开后的总字节数
+    pub total_bytes: u64,
+    /// 压缩包自身大小（分卷只算打开的那一卷）
+    pub archive_bytes: u64,
+    /// 目标里已存在、会按冲突策略处理的相对路径
+    pub conflicts: Vec<String>,
+    pub warnings: Vec<String>,
+    pub skipped_junk: u64,
 }
 
 /// 进度快照。
@@ -394,15 +413,7 @@ impl ArchiveHandle {
     /// 解压。阻塞调用，Swift 侧放到后台线程；进度经 listener 回调，取消经 cancel。
     pub fn extract(&self, request: ExtractRequest, listener: Arc<dyn ProgressListener>, cancel: Arc<CancelHandle>) -> Result<ExtractResult, PiesiError> {
         let mut a = self.inner.lock().unwrap();
-        let mut opts = ExtractOptions::beside_archive(a.path());
-        opts.dest = PathBuf::from(request.dest);
-        opts.smart_folder = request.smart_folder;
-        opts.skip_junk = request.skip_junk;
-        opts.conflict = match request.conflict {
-            Conflict::Overwrite => ConflictPolicy::Overwrite,
-            Conflict::Skip => ConflictPolicy::Skip,
-            Conflict::Rename => ConflictPolicy::Rename,
-        };
+        let opts = extract_options(a.path(), &request);
         let progress = ListenerAdapter(listener);
         let ctx = OpContext::new(&progress, &cancel.token);
         let selected = if request.ids.is_empty() { None } else { Some(request.ids.as_slice()) };
@@ -413,6 +424,24 @@ impl ArchiveHandle {
             skipped: outcome.report.skipped,
             skipped_junk: outcome.skipped_junk,
             warnings: outcome.report.warnings,
+        })
+    }
+
+    /// 只算计划不落盘：根目录、总大小、冲突清单。UI 据此弹冲突 / 磁盘空间 / 压缩炸弹提示。
+    pub fn plan(&self, request: ExtractRequest) -> Result<ExtractPlanInfo, PiesiError> {
+        let a = self.inner.lock().unwrap();
+        let opts = extract_options(a.path(), &request);
+        let selected = if request.ids.is_empty() { None } else { Some(request.ids.as_slice()) };
+        let plan = a.plan(selected, &opts)?;
+        let archive_bytes = std::fs::metadata(a.path()).map(|m| m.len()).unwrap_or(0);
+        Ok(ExtractPlanInfo {
+            root: plan.root.to_string_lossy().into_owned(),
+            entries: plan.items.len() as u64,
+            total_bytes: plan.total_bytes,
+            archive_bytes,
+            conflicts: plan.conflicts,
+            warnings: plan.warnings,
+            skipped_junk: plan.skipped_junk,
         })
     }
 
@@ -429,5 +458,110 @@ impl ArchiveHandle {
         let ctx = OpContext::new(&progress, &cancel.token);
         a.read_entry(id, &mut out, &ctx)?;
         Ok(path.to_string_lossy().into_owned())
+    }
+}
+
+/// 把跨语言的解压请求转成核心选项；dest 为空时解到压缩包所在目录。
+fn extract_options(archive: &Path, request: &ExtractRequest) -> ExtractOptions {
+    let mut opts = ExtractOptions::beside_archive(archive);
+    if !request.dest.is_empty() {
+        opts.dest = PathBuf::from(&request.dest);
+    }
+    opts.smart_folder = request.smart_folder;
+    opts.skip_junk = request.skip_junk;
+    opts.conflict = match request.conflict {
+        Conflict::Overwrite => ConflictPolicy::Overwrite,
+        Conflict::Skip => ConflictPolicy::Skip,
+        Conflict::Rename => ConflictPolicy::Rename,
+    };
+    opts
+}
+
+/// 可创建的格式（和核心 CreateFormat 一一对应）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum CreateFormat {
+    Zip,
+    SevenZ,
+    TarGz,
+    TarXz,
+    TarZst,
+}
+
+impl From<CreateFormat> for piesi_core::create::CreateFormat {
+    fn from(f: CreateFormat) -> Self {
+        match f {
+            CreateFormat::Zip => Self::Zip,
+            CreateFormat::SevenZ => Self::SevenZ,
+            CreateFormat::TarGz => Self::TarGz,
+            CreateFormat::TarXz => Self::TarXz,
+            CreateFormat::TarZst => Self::TarZst,
+        }
+    }
+}
+
+/// 格式的默认扩展名（zip / 7z / tar.gz / tar.xz / tar.zst），UI 拼默认文件名用。
+#[uniffi::export]
+pub fn format_extension(format: CreateFormat) -> String {
+    piesi_core::create::CreateFormat::from(format).extension().to_owned()
+}
+
+/// 压缩请求。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct CreateRequest {
+    /// 输出文件完整路径；已存在会被覆盖，UI 先确认
+    pub dest: String,
+    /// 源文件 / 目录的绝对路径
+    pub sources: Vec<String>,
+    pub format: CreateFormat,
+    /// 0 = 仅存储，1 最快 … 9 最高
+    pub level: u8,
+    pub password: Option<String>,
+    /// 7z：连文件名一起加密
+    pub encrypt_names: bool,
+    /// 跳过 .DS_Store、__MACOSX 等垃圾
+    pub skip_junk: bool,
+    /// 「发给 Windows」：改成 Windows 安全名
+    pub windows_safe: bool,
+}
+
+/// 压缩结果。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct CreateResult {
+    pub entries: u64,
+    pub input_bytes: u64,
+    pub output_bytes: u64,
+    pub skipped_junk: u64,
+    pub warnings: Vec<String>,
+}
+
+/// 创建压缩包。长操作，调用方放后台线程；进度经 listener 节流回调，cancel 可中断。
+/// 失败或取消时删掉写了一半的输出文件，不留残件。
+#[uniffi::export]
+pub fn create_archive(request: CreateRequest, listener: Arc<dyn ProgressListener>, cancel: Arc<CancelHandle>) -> Result<CreateResult, PiesiError> {
+    let opts = CreateOptions {
+        format: request.format.into(),
+        level: request.level,
+        password: request.password,
+        encrypt_names: request.encrypt_names,
+        skip_junk: request.skip_junk,
+        windows_safe: request.windows_safe,
+        ..CreateOptions::default()
+    };
+    let roots: Vec<PathBuf> = request.sources.iter().map(PathBuf::from).collect();
+    let dest = Path::new(&request.dest);
+    let progress = ListenerAdapter(listener);
+    let ctx = OpContext::new(&progress, &cancel.token);
+    match piesi_core::create::create_archive(dest, &roots, &opts, &ctx) {
+        Ok(report) => Ok(CreateResult {
+            entries: report.entries,
+            input_bytes: report.input_bytes,
+            output_bytes: report.output_bytes,
+            skipped_junk: report.skipped_junk,
+            warnings: report.warnings,
+        }),
+        Err(e) => {
+            let _ = std::fs::remove_file(dest);
+            Err(e.into())
+        }
     }
 }
