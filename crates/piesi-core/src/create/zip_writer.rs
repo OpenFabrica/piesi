@@ -228,14 +228,9 @@ fn compress_file(index: usize, item: &SourceItem, level: Compression, store_only
     let mut input = File::open(&item.path)?;
     let mut hasher = crc32fast::Hasher::new();
     let mut size = 0u64;
-    let spill = item.size > SPILL_THRESHOLD;
-    let mut sink: Box<dyn Write> = if spill {
-        Box::new(BufWriter::new(File::create(&tempfile_path::TempPath::new_in(spill_dir, index).0)?))
-    } else {
-        Box::new(Vec::with_capacity(item.size.min(SPILL_THRESHOLD) as usize))
-    };
-    // 这里拿不回 Box<dyn Write> 里的 Vec，所以用一个小技巧：内存路径单独走
-    if !spill {
+
+    if item.size <= SPILL_THRESHOLD {
+        // 小文件：压进内存
         let mut buf: Vec<u8> = Vec::with_capacity(item.size as usize + 64);
         let method = if store_only {
             copy_with_crc(&mut input, &mut buf, &mut hasher, &mut size)?;
@@ -255,21 +250,24 @@ fn compress_file(index: usize, item: &SourceItem, level: Compression, store_only
                 METHOD_DEFLATE
             }
         };
-        drop(sink);
         return Ok(Compressed { index, method, crc: hasher.finalize(), size, data: Payload::Memory(buf) });
     }
+
+    // 大文件：压到临时文件。TempPath 必须活到 Payload 被消费完，它 drop 时会删文件。
     let tmp = tempfile_path::TempPath::new_in(spill_dir, index);
     let method = if store_only {
-        copy_with_crc(&mut input, &mut sink, &mut hasher, &mut size)?;
+        let mut f = BufWriter::new(File::create(&tmp.0)?);
+        copy_with_crc(&mut input, &mut f, &mut hasher, &mut size)?;
+        f.flush()?;
         METHOD_STORE
     } else {
-        let mut enc = DeflateEncoder::new(sink, level);
+        let mut enc = DeflateEncoder::new(BufWriter::new(File::create(&tmp.0)?), level);
         copy_with_crc(&mut input, &mut enc, &mut hasher, &mut size)?;
         let mut w = enc.finish()?;
         w.flush()?;
         drop(w);
         if std::fs::metadata(&tmp.0)?.len() >= size {
-            // 没变小：重新存储
+            // 没变小：重新按存储写一遍
             let mut f = BufWriter::new(File::create(&tmp.0)?);
             input.rewind()?;
             let mut h2 = crc32fast::Hasher::new();
