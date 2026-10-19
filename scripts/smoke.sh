@@ -142,4 +142,27 @@ d="$T/m-piesi"; mkdir -p "$d"; "$PIESI" x -q -o "$d" "$T/mac.zip"
 [ ! -e "$d/mac源/__MACOSX" ] && [ ! -e "$d/__MACOSX" ] || fail "piesi 解自己的 Mac 专用包时没跳过 __MACOSX"
 diff -r "$MSRC" "$d/mac源" || fail "Mac 专用包解压内容与源不一致"
 echo "  __MACOSX/._ 条目位置正确、不含 quarantine；ditto 还原 xattr / 资源分支 / Finder 信息；piesi 解压时跳过"
+
+echo "## 7. 加密 zip（AES-256）：piesi 建 → 7zz 校验 / 解压；7zz 建 → piesi 解压；错密码拒绝"
+( cd "$T" && "$PIESI" a -q -p SECRET enc.zip "源目录 测试" )
+"$SEVENZ" t -pSECRET "$T/enc.zip" >/dev/null || fail "7zz 校验 piesi 加密 zip"
+"$SEVENZ" t -pWRONG "$T/enc.zip" >/dev/null 2>&1 && fail "7zz 用错密码竟然通过"
+python3 -I - "$T/enc.zip" <<'PY' || fail "加密 zip 头字段检查"
+import sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+files = [i for i in z.infolist() if not i.is_dir()]
+assert files and all(i.flag_bits & 1 and i.compress_type == 99 for i in files), [(i.filename, i.flag_bits, i.compress_type) for i in files]
+assert not any(i.flag_bits & 1 for i in z.infolist() if i.is_dir()), "目录条目不该标加密"
+print("  加密 zip：", len(files), "个文件条目全部 AES（方法 99 + bit 0），目录条目不加密")
+PY
+d="$T/e-7zz"; mkdir -p "$d"; "$SEVENZ" x -bso0 -pSECRET -o"$d" "$T/enc.zip"
+diff -r --exclude=.DS_Store --exclude=__MACOSX --exclude=链接 "$SRC" "$d/源目录 测试" || fail "7zz 解 piesi 加密 zip 内容不一致"
+d="$T/e-piesi"; mkdir -p "$d"; "$PIESI" x -q -o "$d" -p SECRET "$T/enc.zip"
+diff -r --exclude=.DS_Store --exclude=__MACOSX "$SRC" "$d/源目录 测试" || fail "piesi 解自己的加密 zip 内容不一致"
+[ -L "$d/源目录 测试/链接" ] || fail "加密 zip 的符号链接没保留"
+"$PIESI" x -q -o "$T/e-wrong" -p WRONG "$T/enc.zip" 2>/dev/null && fail "zip 错密码竟然成功"
+( cd "$T" && "$SEVENZ" a -bso0 -tzip -pSECRET -mem=AES256 ref-enc.zip "源目录 测试" )
+d="$T/e-ref"; mkdir -p "$d"; "$PIESI" x -q -o "$d" -p SECRET "$T/ref-enc.zip"
+diff -r --exclude=.DS_Store --exclude=__MACOSX "$SRC" "$d/源目录 测试" || fail "7zz 建的 AES zip 解压不一致"
+echo "  AES zip 双向互通（piesi ↔ 7zz），错密码两边都拒绝"
 echo "全部通过"

@@ -20,6 +20,7 @@ piesi x 包.7z -o 目标目录 -p 密码    # 指定目录与密码；--id 3 --i
 piesi t 包.zip                      # 校验（解码 + CRC，不写盘），损坏或密码错误时退出码非 0
 piesi a 输出.zip 目录 文件…          # 创建 zip（UTF-8 + bit 11 + NFC，多线程）
 piesi a 输出.zip --mac-metadata 目录  # 「Mac 专用」zip：标签、资源分支、Finder 信息写成 __MACOSX/._ 条目，ditto / 归档工具可还原
+piesi a 输出.zip -p 密码 目录         # AES-256 加密 zip（WinZip AE-1/AE-2 格式，7-Zip / WinZip / Keka 可解）；7z 同样用 -p，--encrypt-names 连文件名一起加密
 piesi a 输出.7z --level 7 目录      # 创建 7z（多线程 LZMA2，solid 块 128 MB）
 piesi a 输出.tar.zst 目录           # tar.gz / tar.xz / tar.zst
 ```
@@ -27,7 +28,7 @@ piesi a 输出.tar.zst 目录           # tar.gz / tar.xz / tar.zst
 Quick Look 扩展已可用：在 Finder 里按空格预览 zip / 7z / rar / tar 的条目树（只读索引，不解压）。macOS app 的解压流程、浏览窗口、Finder 右键 Services 正在做。
 
 支持读取：zip（zip64、AES、ZipCrypto、`.zip.001`、`.z01` 分卷）、7z（BCJ/BCJ2/ARM64、solid、头加密、`.7z.001`）、rar（v4/v5、分卷、加密）、tar 及 tar.gz/bz2/xz/zst、单文件 gz/bz2/xz/zst。
-支持创建：zip、7z、tar.gz、tar.xz、tar.zst。macOS app 与 Quick Look 扩展在 `apple/`。
+支持创建：zip（可 AES-256 加密）、7z（可 AES-256 加密、加密文件名）、tar.gz、tar.xz、tar.zst。macOS app 与 Quick Look 扩展在 `apple/`。
 
 ## 开发
 

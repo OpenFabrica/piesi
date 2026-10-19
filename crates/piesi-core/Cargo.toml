@@ -23,6 +23,7 @@ aes.workspace = true
 hmac.workspace = true
 pbkdf2.workspace = true
 sha1.workspace = true
+getrandom.workspace = true
 encoding_rs.workspace = true
 chardetng.workspace = true
 unicode-normalization.workspace = true

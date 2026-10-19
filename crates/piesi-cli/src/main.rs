@@ -123,6 +123,7 @@ enum Cmd {
         /// 压缩级别 0-9（0 = 仅存储）
         #[arg(long, default_value_t = 5)]
         level: u8,
+        /// 密码：zip 用 WinZip AES-256（AE-1 / AE-2，7-Zip / WinZip / Keka 可解），7z 用 AES-256
         #[arg(short, long)]
         password: Option<String>,
         /// 7z：连文件名一起加密

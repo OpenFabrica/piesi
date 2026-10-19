@@ -553,6 +553,7 @@ pub struct CreateRequest {
     pub format: CreateFormat,
     /// 0 = 仅存储，1 最快 … 9 最高
     pub level: u8,
+    /// 密码：zip 用 WinZip AES-256（AE-1 / AE-2），7z 用 AES-256；None = 不加密
     pub password: Option<String>,
     /// 7z：连文件名一起加密
     pub encrypt_names: bool,

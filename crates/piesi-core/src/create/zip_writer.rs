@@ -1,5 +1,5 @@
 //! 自写 ZIP 写入器：UTF-8 + bit 11、NFC（上游已做）、zip64、Unix 权限、UT 时间戳，
-//! 多文件并行 deflate，可选「Mac 专用」的 `__MACOSX/._名字` AppleDouble 条目。
+//! 多文件并行 deflate，可选 WinZip AES-256 加密（AE-1 / AE-2），可选「Mac 专用」的 `__MACOSX/._名字` AppleDouble 条目。
 //! 不用 `zip` crate 的原因：它没有「接收已压缩数据」的接口，做不了并行。
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,6 +14,7 @@ use flate2::Compression;
 use crate::archive::EntryKind;
 use crate::create::apple_double;
 use crate::create::{CreateOptions, SourceItem, Sources};
+use crate::fmt::zip::aes as zipaes;
 use crate::progress::{OpContext, Throttle};
 use crate::{Error, Result};
 
@@ -25,6 +26,13 @@ const SIG_EOCD64_LOC: u32 = 0x0706_4b50;
 const FLAG_UTF8: u16 = 1 << 11;
 const METHOD_STORE: u16 = 0;
 const METHOD_DEFLATE: u16 = 8;
+/// WinZip AES 包装方法号，真实方法在 0x9901 扩展字段里
+const METHOD_AES: u16 = 99;
+const FLAG_ENCRYPTED: u16 = 1 << 0;
+/// 只写 AES-256（WinZip 规范里的强度 3）
+const AES_STRENGTH: u8 = 3;
+/// 明文短于这个长度用 AE-2（CRC 字段写 0）：CRC 能被穷举反推很短的明文，这是 WinZip 自己的规则
+const AE2_BELOW: u64 = 20;
 const VERSION_MADE_BY: u16 = (3 << 8) | 63; // 主机 Unix，规范 6.3
 const ZIP64_LIMIT: u64 = 0xFFFF_FFFF;
 /// 超过这个大小的压缩结果落到临时文件，避免一堆 worker 同时把大文件压在内存里
@@ -79,18 +87,25 @@ struct CentralRecord {
     mtime: Option<i64>,
     external_attrs: u32,
     local_offset: u64,
+    /// 加密条目：(AE 版本, 真实方法)，中央目录要再写一次 0x9901
+    aes: Option<(u16, u16)>,
 }
 
 /// 写出一个 ZIP，返回写入过程中产生的 warning（目前只有 Mac 元数据读取/跳过的提示）。
 pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpContext<'_>) -> Result<Vec<String>> {
     let threads = if opts.threads == 0 { std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4) } else { opts.threads };
     let level = Compression::new(zip_level(opts.level));
+    // 编码参数：级别 0 = 存储；有密码 = 每个文件 / 链接 / AppleDouble 条目都 AES-256 加密（目录条目没有数据，不加密）
+    let enc = EncodeOpts { deflate: (opts.level != 0).then_some(level), password: opts.password.as_deref().map(str::as_bytes) };
     let spill_dir = dest.parent().unwrap_or(Path::new(".")).to_path_buf();
     let file = File::create(dest)?;
     let mut out = CountingWriter { inner: BufWriter::with_capacity(1 << 20, file), offset: 0 };
     let mut throttle = Throttle::new(ctx, Some(sources.total_bytes), Some(sources.items.len() as u64));
     let mut records: Vec<CentralRecord> = Vec::with_capacity(sources.items.len());
     let mut warnings: Vec<String> = Vec::new();
+    if enc.password.is_some() && opts.encrypt_names {
+        warnings.push("zip 不能加密文件名（只有 7z 可以），文件名未加密".into());
+    }
 
     // 并行压缩：worker 池按 index 乱序产出，主线程用 BTreeMap 按序回收后顺序写入。
     // 有界通道限制同时在飞的结果数，内存不会随文件数线性增长。
@@ -127,7 +142,7 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
                     let tx = tx_files.clone();
                     let spill_dir = spill_dir.clone();
                     s.spawn(move |_| {
-                        let r = compress_file(index, item, level, opts.level == 0, &spill_dir);
+                        let r = compress_file(index, item, enc, &spill_dir);
                         let _ = tx.send(r);
                     });
                 }
@@ -142,17 +157,19 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
                 match item.kind {
                     EntryKind::Dir => {
                         let name = format!("{}/", item.rel).into_bytes();
-                        let rec = write_local(out, name, METHOD_STORE, 0, 0, 0, item, 0x10)?;
+                        let rec = write_local(out, name, METHOD_STORE, 0, 0, 0, item, 0x10, None)?;
                         records.push(rec);
                         if opts.mac_metadata {
-                            write_apple_double(out, records, item, &mut macosx_dirs, level, opts.level == 0, warnings)?;
+                            write_apple_double(out, records, item, &mut macosx_dirs, enc, warnings)?;
                         }
                     }
                     EntryKind::Symlink => {
                         let target = item.link_target.clone().unwrap_or_default();
                         let crc = crc32fast::hash(&target);
-                        let rec = write_local(out, item.rel.clone().into_bytes(), METHOD_STORE, crc, target.len() as u64, target.len() as u64, item, 0)?;
-                        out.write_all(&target)?;
+                        // 链接目标也是内容，有密码就一样加密；很短，不压缩
+                        let (_, payload) = encode_bytes(&target, EncodeOpts { deflate: None, ..enc })?;
+                        let rec = write_local(out, item.rel.clone().into_bytes(), METHOD_STORE, crc, payload.len() as u64, target.len() as u64, item, 0, enc.ae_version(target.len() as u64))?;
+                        out.write_all(&payload)?;
                         records.push(rec);
                     }
                     EntryKind::File => {
@@ -172,7 +189,7 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
                             Payload::Memory(v) => v.len() as u64,
                             Payload::Spilled(p) => std::fs::metadata(&p.0)?.len(),
                         };
-                        let rec = write_local(out, item.rel.clone().into_bytes(), comp.method, comp.crc, csize, comp.size, item, 0)?;
+                        let rec = write_local(out, item.rel.clone().into_bytes(), comp.method, comp.crc, csize, comp.size, item, 0, enc.ae_version(comp.size))?;
                         match comp.data {
                             Payload::Memory(v) => out.write_all(&v)?,
                             Payload::Spilled(p) => {
@@ -183,7 +200,7 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
                         throttle.add_bytes(comp.size)?;
                         records.push(rec);
                         if opts.mac_metadata {
-                            write_apple_double(out, records, item, &mut macosx_dirs, level, opts.level == 0, warnings)?;
+                            write_apple_double(out, records, item, &mut macosx_dirs, enc, warnings)?;
                         }
                     }
                 }
@@ -233,8 +250,7 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
 /// 「Mac 专用」：读 item 的 Finder 信息、扩展属性、资源分支，打成 AppleDouble 写成
 /// `__MACOSX/<同目录>/._<名字>` 条目，紧跟在 item 自己的条目后面；没有元数据就什么都不写。
 /// 读元数据失败只记 warning 不中断——丢一个文件的标签不值得让整个包失败。符号链接由调用方跳过。
-#[allow(clippy::too_many_arguments)]
-fn write_apple_double(out: &mut CountingWriter, records: &mut Vec<CentralRecord>, item: &SourceItem, macosx_dirs: &mut BTreeSet<String>, level: Compression, store_only: bool, warnings: &mut Vec<String>) -> Result<()> {
+fn write_apple_double(out: &mut CountingWriter, records: &mut Vec<CentralRecord>, item: &SourceItem, macosx_dirs: &mut BTreeSet<String>, enc: EncodeOpts<'_>, warnings: &mut Vec<String>) -> Result<()> {
     let meta = match apple_double::read(&item.path, warnings) {
         Ok(m) => m,
         Err(e) => {
@@ -248,10 +264,10 @@ fn write_apple_double(out: &mut CountingWriter, records: &mut Vec<CentralRecord>
     let ad_rel = apple_double::apple_double_rel(&item.rel);
     ensure_macosx_dirs(out, records, &ad_rel, item, macosx_dirs)?;
     let raw = apple_double::encode(&meta);
-    let (method, payload) = deflate_bytes(&raw, level, store_only)?;
+    let (method, payload) = encode_bytes(&raw, enc)?;
     // `._` 条目和 ditto 一样：普通文件、0644、时间跟原条目
     let ad_item = SourceItem { rel: ad_rel.clone(), path: item.path.clone(), kind: EntryKind::File, size: raw.len() as u64, mtime: item.mtime, mode: Some(0o644), link_target: None };
-    let rec = write_local(out, ad_rel.into_bytes(), method, crc32fast::hash(&raw), payload.len() as u64, raw.len() as u64, &ad_item, 0)?;
+    let rec = write_local(out, ad_rel.into_bytes(), method, crc32fast::hash(&raw), payload.len() as u64, raw.len() as u64, &ad_item, 0, enc.ae_version(raw.len() as u64))?;
     out.write_all(&payload)?;
     records.push(rec);
     Ok(())
@@ -268,24 +284,85 @@ fn ensure_macosx_dirs(out: &mut CountingWriter, records: &mut Vec<CentralRecord>
         acc.push_str(comp);
         if done.insert(acc.clone()) {
             let dir_item = SourceItem { rel: acc.clone(), path: item.path.clone(), kind: EntryKind::Dir, size: 0, mtime: item.mtime, mode: Some(0o755), link_target: None };
-            let rec = write_local(out, format!("{acc}/").into_bytes(), METHOD_STORE, 0, 0, 0, &dir_item, 0x10)?;
+            let rec = write_local(out, format!("{acc}/").into_bytes(), METHOD_STORE, 0, 0, 0, &dir_item, 0x10, None)?;
             records.push(rec);
         }
     }
     Ok(())
 }
 
-/// 在内存里 deflate 一段小数据（AppleDouble 最多 64 MB 量级），没变小就改存储，和文件条目的规则一致。
-fn deflate_bytes(raw: &[u8], level: Compression, store_only: bool) -> Result<(u16, Vec<u8>)> {
-    if !store_only {
-        let mut enc = DeflateEncoder::new(Vec::with_capacity(raw.len() / 2 + 64), level);
-        enc.write_all(raw)?;
-        let packed = enc.finish()?;
-        if packed.len() < raw.len() {
+/// 一个条目的编码参数：是否 deflate（None = 存储）、口令（Some = AES-256 加密）。
+#[derive(Clone, Copy)]
+struct EncodeOpts<'a> {
+    deflate: Option<Compression>,
+    password: Option<&'a [u8]>,
+}
+
+impl EncodeOpts<'_> {
+    /// 加密时每个条目多出的固定字节：盐 + 口令校验值 + 认证码。
+    fn overhead(&self) -> u64 {
+        if self.password.is_some() {
+            zipaes::overhead(AES_STRENGTH)
+        } else {
+            0
+        }
+    }
+
+    /// 条目要用的 AE 版本：不加密 None；明文短于 20 字节用 AE-2（CRC 写 0），其余 AE-1（保留 CRC）。
+    /// 这是 WinZip 自己的规则：CRC 能被穷举反推很短的明文，长文件则靠 CRC 多一道完整性校验。
+    fn ae_version(&self, plain_len: u64) -> Option<u16> {
+        self.password.map(|_| if plain_len < AE2_BELOW { 2 } else { 1 })
+    }
+}
+
+/// 把 `input` 按 `opts` 压缩（或存储）、加密后写进 `sink`，返回 (sink, 明文 CRC, 明文字节数)。
+/// 加密时 sink 里先是盐 + 口令校验值，中间是密文，末尾是认证码；每个条目取一次新的随机盐。
+fn encode_stream<W: Write>(input: &mut dyn Read, sink: W, opts: EncodeOpts<'_>) -> Result<(W, u32, u64)> {
+    let mut hasher = crc32fast::Hasher::new();
+    let mut size = 0u64;
+    let sink = match opts.password {
+        Some(pw) => {
+            let mut salt = [0u8; 16];
+            debug_assert_eq!(zipaes::salt_len(AES_STRENGTH), salt.len());
+            getrandom::fill(&mut salt).map_err(|e| Error::Other(format!("取不到随机盐：{e}")))?;
+            let mut enc = zipaes::AesWriter::new(sink, pw, AES_STRENGTH, &salt)?;
+            match opts.deflate {
+                Some(level) => {
+                    let mut deflate = DeflateEncoder::new(enc, level);
+                    copy_with_crc(input, &mut deflate, &mut hasher, &mut size)?;
+                    enc = deflate.finish()?;
+                }
+                None => copy_with_crc(input, &mut enc, &mut hasher, &mut size)?,
+            }
+            enc.finish()?
+        }
+        None => match opts.deflate {
+            Some(level) => {
+                let mut deflate = DeflateEncoder::new(sink, level);
+                copy_with_crc(input, &mut deflate, &mut hasher, &mut size)?;
+                deflate.finish()?
+            }
+            None => {
+                let mut sink = sink;
+                copy_with_crc(input, &mut sink, &mut hasher, &mut size)?;
+                sink
+            }
+        },
+    };
+    Ok((sink, hasher.finalize(), size))
+}
+
+/// 在内存里编码一小段数据（符号链接目标、AppleDouble，最多 64 MB 量级），返回 (方法, 包内字节)。
+/// 先试 deflate，没变小就改存储，和文件条目的规则一致；比较时不算加密开销。
+fn encode_bytes(raw: &[u8], opts: EncodeOpts<'_>) -> Result<(u16, Vec<u8>)> {
+    if opts.deflate.is_some() {
+        let (packed, _, _) = encode_stream(&mut &raw[..], Vec::with_capacity(raw.len() / 2 + 64), opts)?;
+        if packed.len() as u64 - opts.overhead() < raw.len() as u64 {
             return Ok((METHOD_DEFLATE, packed));
         }
     }
-    Ok((METHOD_STORE, raw.to_vec()))
+    let (packed, _, _) = encode_stream(&mut &raw[..], Vec::with_capacity(raw.len() + 64), EncodeOpts { deflate: None, ..opts })?;
+    Ok((METHOD_STORE, packed))
 }
 
 /// 把 0–9 的通用级别映射成 deflate 级别（0 = 存储，由调用方单独处理）。
@@ -294,63 +371,37 @@ fn zip_level(level: u8) -> u32 {
 }
 
 /// 在 worker 线程里压缩一个文件：边读边算 CRC，结果放内存或临时文件。
-/// 压完发现没变小（已压缩的媒体文件常见）就改为存储，和 7-Zip 的行为一致。
-fn compress_file(index: usize, item: &SourceItem, level: Compression, store_only: bool, spill_dir: &Path) -> Result<Compressed> {
+/// 压完发现没变小（已压缩的媒体文件常见）就改为存储，和 7-Zip 的行为一致；加密时重算一遍（换新盐）。
+fn compress_file(index: usize, item: &SourceItem, opts: EncodeOpts<'_>, spill_dir: &Path) -> Result<Compressed> {
     let mut input = File::open(&item.path)?;
-    let mut hasher = crc32fast::Hasher::new();
-    let mut size = 0u64;
+    let store = EncodeOpts { deflate: None, ..opts };
+    let method = if opts.deflate.is_some() { METHOD_DEFLATE } else { METHOD_STORE };
 
     if item.size <= SPILL_THRESHOLD {
         // 小文件：压进内存
-        let mut buf: Vec<u8> = Vec::with_capacity(item.size as usize + 64);
-        let method = if store_only {
-            copy_with_crc(&mut input, &mut buf, &mut hasher, &mut size)?;
-            METHOD_STORE
-        } else {
-            let mut enc = DeflateEncoder::new(&mut buf, level);
-            copy_with_crc(&mut input, &mut enc, &mut hasher, &mut size)?;
-            enc.finish()?;
-            if buf.len() as u64 >= size {
-                buf.clear();
-                input.rewind()?;
-                let mut h2 = crc32fast::Hasher::new();
-                let mut s2 = 0;
-                copy_with_crc(&mut input, &mut buf, &mut h2, &mut s2)?;
-                METHOD_STORE
-            } else {
-                METHOD_DEFLATE
-            }
-        };
-        return Ok(Compressed { index, method, crc: hasher.finalize(), size, data: Payload::Memory(buf) });
+        let cap = item.size as usize + 64;
+        let (buf, crc, size) = encode_stream(&mut input, Vec::with_capacity(cap), opts)?;
+        if method == METHOD_DEFLATE && buf.len() as u64 - opts.overhead() >= size {
+            input.rewind()?;
+            let (buf, crc, size) = encode_stream(&mut input, Vec::with_capacity(cap), store)?;
+            return Ok(Compressed { index, method: METHOD_STORE, crc, size, data: Payload::Memory(buf) });
+        }
+        return Ok(Compressed { index, method, crc, size, data: Payload::Memory(buf) });
     }
 
     // 大文件：压到临时文件。TempPath 必须活到 Payload 被消费完，它 drop 时会删文件。
     let tmp = tempfile_path::TempPath::new_in(spill_dir, index);
-    let method = if store_only {
-        let mut f = BufWriter::new(File::create(&tmp.0)?);
-        copy_with_crc(&mut input, &mut f, &mut hasher, &mut size)?;
-        f.flush()?;
-        METHOD_STORE
-    } else {
-        let mut enc = DeflateEncoder::new(BufWriter::new(File::create(&tmp.0)?), level);
-        copy_with_crc(&mut input, &mut enc, &mut hasher, &mut size)?;
-        let mut w = enc.finish()?;
+    let (mut w, crc, size) = encode_stream(&mut input, BufWriter::new(File::create(&tmp.0)?), opts)?;
+    w.flush()?;
+    drop(w);
+    if method == METHOD_DEFLATE && std::fs::metadata(&tmp.0)?.len() - opts.overhead() >= size {
+        // 没变小：重新按存储写一遍
+        input.rewind()?;
+        let (mut w, crc, size) = encode_stream(&mut input, BufWriter::new(File::create(&tmp.0)?), store)?;
         w.flush()?;
-        drop(w);
-        if std::fs::metadata(&tmp.0)?.len() >= size {
-            // 没变小：重新按存储写一遍
-            let mut f = BufWriter::new(File::create(&tmp.0)?);
-            input.rewind()?;
-            let mut h2 = crc32fast::Hasher::new();
-            let mut s2 = 0;
-            copy_with_crc(&mut input, &mut f, &mut h2, &mut s2)?;
-            f.flush()?;
-            METHOD_STORE
-        } else {
-            METHOD_DEFLATE
-        }
-    };
-    Ok(Compressed { index, method, crc: hasher.finalize(), size, data: Payload::Spilled(tmp) })
+        return Ok(Compressed { index, method: METHOD_STORE, crc, size, data: Payload::Spilled(tmp) });
+    }
+    Ok(Compressed { index, method, crc, size, data: Payload::Spilled(tmp) })
 }
 
 /// 边拷贝边算 CRC32 和字节数。
@@ -464,8 +515,8 @@ fn civil_from_days(z: i64) -> (i32, u32, u32) {
     ((if m <= 2 { y + 1 } else { y }) as i32, m, d)
 }
 
-/// 条目的扩展字段：zip64（按需）+ UT 时间戳。
-fn extra_fields(csize: u64, usize_: u64, offset: Option<u64>, mtime: Option<i64>) -> Vec<u8> {
+/// 条目的扩展字段：zip64（按需）+ UT 时间戳 + WinZip AES（0x9901：AE 版本、"AE"、强度、真实方法）。
+fn extra_fields(csize: u64, usize_: u64, offset: Option<u64>, mtime: Option<i64>, aes: Option<(u16, u16)>) -> Vec<u8> {
     let mut extra = Vec::new();
     let need64 = csize > ZIP64_LIMIT || usize_ > ZIP64_LIMIT || offset.is_some_and(|o| o > ZIP64_LIMIT);
     if need64 {
@@ -487,20 +538,35 @@ fn extra_fields(csize: u64, usize_: u64, offset: Option<u64>, mtime: Option<i64>
             extra.extend_from_slice(&m32.to_le_bytes());
         }
     }
+    if let Some((vendor_version, method)) = aes {
+        extra.extend_from_slice(&0x9901u16.to_le_bytes());
+        extra.extend_from_slice(&7u16.to_le_bytes());
+        extra.extend_from_slice(&vendor_version.to_le_bytes());
+        extra.extend_from_slice(b"AE");
+        extra.push(AES_STRENGTH);
+        extra.extend_from_slice(&method.to_le_bytes());
+    }
     extra
 }
 
-/// 写 local header，返回中央目录记录。`dos_attr` 目录为 0x10。
+/// 写 local header，返回中央目录记录。`dos_attr` 目录为 0x10；`aes` 是 AE 版本（None = 不加密）：
+/// 加密时方法字段写 99、真实方法进 0x9901 扩展字段、置 bit 0，AE-2 的 CRC 字段按规范写 0。
 /// 参数就是 ZIP 头的字段，拆成结构体只会多一层壳，这里允许超过 7 个。
 #[allow(clippy::too_many_arguments)]
-fn write_local(out: &mut CountingWriter, name: Vec<u8>, method: u16, crc: u32, csize: u64, usize_: u64, item: &SourceItem, dos_attr: u32) -> Result<CentralRecord> {
+fn write_local(out: &mut CountingWriter, name: Vec<u8>, method: u16, crc: u32, csize: u64, usize_: u64, item: &SourceItem, dos_attr: u32, aes: Option<u16>) -> Result<CentralRecord> {
     let local_offset = out.offset;
     let (dos_time, dos_date) = dos_datetime(item.mtime);
-    let extra = extra_fields(csize, usize_, None, item.mtime);
+    let aes = aes.map(|version| (version, method));
+    let (method, crc, flags) = match aes {
+        Some((2, _)) => (METHOD_AES, 0, FLAG_UTF8 | FLAG_ENCRYPTED),
+        Some(_) => (METHOD_AES, crc, FLAG_UTF8 | FLAG_ENCRYPTED),
+        None => (method, crc, FLAG_UTF8),
+    };
+    let extra = extra_fields(csize, usize_, None, item.mtime, aes);
     let need64 = csize > ZIP64_LIMIT || usize_ > ZIP64_LIMIT;
     out.write_u32(SIG_LOCAL)?;
-    out.write_u16(if need64 { 45 } else { 20 })?;
-    out.write_u16(FLAG_UTF8)?;
+    out.write_u16(version_needed(need64, aes.is_some()))?;
+    out.write_u16(flags)?;
     out.write_u16(method)?;
     out.write_u16(dos_time)?;
     out.write_u16(dos_date)?;
@@ -519,7 +585,7 @@ fn write_local(out: &mut CountingWriter, name: Vec<u8>, method: u16, crc: u32, c
     Ok(CentralRecord {
         name,
         method,
-        flags: FLAG_UTF8,
+        flags,
         dos_time,
         dos_date,
         crc,
@@ -528,16 +594,28 @@ fn write_local(out: &mut CountingWriter, name: Vec<u8>, method: u16, crc: u32, c
         mtime: item.mtime,
         external_attrs: (mode << 16) | dos_attr,
         local_offset,
+        aes,
     })
+}
+
+/// 解压所需版本：AES 要 5.1（WinZip 规范），zip64 要 4.5，其余 2.0。
+fn version_needed(need64: bool, aes: bool) -> u16 {
+    if aes {
+        51
+    } else if need64 {
+        45
+    } else {
+        20
+    }
 }
 
 /// 写一条中央目录记录。
 fn write_central(out: &mut CountingWriter, rec: &CentralRecord) -> Result<()> {
-    let extra = extra_fields(rec.csize, rec.usize_, Some(rec.local_offset), rec.mtime);
+    let extra = extra_fields(rec.csize, rec.usize_, Some(rec.local_offset), rec.mtime, rec.aes);
     let need64 = rec.csize > ZIP64_LIMIT || rec.usize_ > ZIP64_LIMIT || rec.local_offset > ZIP64_LIMIT;
     out.write_u32(SIG_CENTRAL)?;
     out.write_u16(VERSION_MADE_BY)?;
-    out.write_u16(if need64 { 45 } else { 20 })?;
+    out.write_u16(version_needed(need64, rec.aes.is_some()))?;
     out.write_u16(rec.flags)?;
     out.write_u16(rec.method)?;
     out.write_u16(rec.dos_time)?;

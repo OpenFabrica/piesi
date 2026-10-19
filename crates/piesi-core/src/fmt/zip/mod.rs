@@ -1,7 +1,7 @@
 //! ZIP 读取器：自写容器解析（EOCD / zip64 / 中央目录 / 本地头、字节分卷与 PKWARE 多盘分卷、
 //! ZipCrypto 与 WinZip AES），解压交给 `codec`，落盘交给 `EntrySink`。zip 条目彼此独立，可随机访问。
 
-mod aes;
+pub(crate) mod aes;
 mod bytes;
 mod cd;
 mod extra;

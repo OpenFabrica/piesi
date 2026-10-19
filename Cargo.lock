@@ -906,6 +906,7 @@ dependencies = [
  "deflate64",
  "encoding_rs",
  "flate2",
+ "getrandom",
  "hmac",
  "libc",
  "liblzma",

@@ -65,7 +65,7 @@
 - 浏览：zip/7z/rar 打开即看（只读目录区），tar.* 打开即显示索引进度；列表/大纲、搜索、排序、面包屑、按条目 Quick Look 预览、选择性解压、拖出即解压。
 - 编码：自动识别 + 顶栏常驻选择器（带 5 个样本名实时预览），切换只重解码。
 - 干净压缩：默认排除 `__MACOSX`、`.DS_Store`、`._*`、`Thumbs.db`、`desktop.ini`；写 UTF-8 + bit 11 + NFC。
-- 加密：ZIP AES-256（打开 ZipCrypto 包时提示不安全）；7z AES-256 + 可选加密文件名。
+- 加密：ZIP AES-256（打开 ZipCrypto 包时提示不安全）；7z AES-256 + 可选加密文件名。已实现（2026-10-20）：zip 写 WinZip AE 格式（明文 <20 字节 AE-2 不写 CRC，其余 AE-1；每条目随机盐；目录条目不加密），与 7zz 双向互通；7z 加密与文件名加密早已实现。
 - 安全：cap-std 输出、zip-slip、符号链接逃逸、压缩炸弹预警、磁盘空间预检、quarantine 传播、255 字节文件名截断、大小写冲突预检。
 - 系统集成：设为默认解压工具、Finder 右键 Services（压缩 / 解压到此处 / 用 Piesi 查看）、拖到 Dock 图标、Shortcuts（App Intents）、Quick Look 扩展（只读索引）。
 - 冲突处理：覆盖 / 跳过 / 重命名 / 合并；智能建文件夹（包内多个顶层项才建）。

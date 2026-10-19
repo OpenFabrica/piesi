@@ -1,9 +1,10 @@
 //! ZIP 写入器集成测试：用自己的读取器回读，覆盖内存路径、溢出到临时文件的大文件路径、不可压缩改存储。
 
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
-use piesi_core::archive::{Entry, EntryKind, EntrySink, Method};
+use piesi_core::archive::{Entry, EntryKind, EntrySink, Method, PasswordNeed};
 use piesi_core::create::{create_archive, CreateFormat, CreateOptions};
 use piesi_core::progress::OpContext;
 
@@ -106,5 +107,103 @@ fn spill_store_and_memory_paths_roundtrip() {
         assert_eq!(*n, original.len() as u64, "{name} 大小不符");
         assert_eq!(*crc, crc32fast::hash(&original), "{name} CRC 不符");
     }
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+/// xorshift 伪随机字节：不可压缩的数据。
+fn pseudo_random(n: usize) -> Vec<u8> {
+    let mut x = 0x9e3779b97f4a7c15u64;
+    (0..n)
+        .map(|_| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x >> 56) as u8
+        })
+        .collect()
+}
+
+/// 带密码的 zip：文件、链接全部 AES-256，目录条目不加密；短于 20 字节走 AE-2（无 CRC），其余 AE-1；
+/// 错密码拒绝，正确密码回读 CRC 一致；本机有 7zz 时让它校验并解压比对。
+#[test]
+fn aes_encrypted_roundtrip() {
+    let work = workdir("aes");
+    let src = work.join("src");
+    std::fs::create_dir_all(src.join("sub")).unwrap();
+    std::fs::write(src.join("tiny.txt"), "hi").unwrap();
+    std::fs::write(src.join("empty.txt"), "").unwrap();
+    std::fs::write(src.join("sub/text.txt"), "lorem ipsum ".repeat(5000)).unwrap();
+    let random = pseudo_random(1 << 16);
+    std::fs::write(src.join("sub/random.bin"), &random).unwrap();
+    std::os::unix::fs::symlink("text.txt", src.join("sub/link")).unwrap();
+
+    let out = work.join("enc.zip");
+    let password = "s3cret-Pass";
+    let opts = CreateOptions { format: CreateFormat::Zip, level: 5, password: Some(password.into()), encrypt_names: true, ..Default::default() };
+    let report = create_archive(&out, std::slice::from_ref(&src), &opts, &OpContext::silent()).unwrap();
+    assert_eq!(report.warnings.len(), 1, "encrypt_names 对 zip 无效应有提示：{:?}", report.warnings);
+
+    let mut reader = piesi_core::open(&out).unwrap();
+    assert_ne!(reader.needs_password(), PasswordNeed::None);
+    let entries = reader.entries().to_vec();
+    let name_of = |e: &Entry| String::from_utf8_lossy(&e.raw_name).into_owned();
+    let by_name = |n: &str| entries.iter().find(|e| name_of(e).ends_with(n)).cloned().unwrap_or_else(|| panic!("缺少 {n}"));
+    for e in &entries {
+        assert_eq!(e.encrypted, e.kind != EntryKind::Dir, "{}：只有目录条目不加密", name_of(e));
+    }
+    assert_eq!(by_name("tiny.txt").crc32, None, "短文件应用 AE-2，不写 CRC");
+    assert_eq!(by_name("empty.txt").crc32, None);
+    assert!(by_name("text.txt").crc32.is_some(), "长文件应用 AE-1，保留 CRC");
+    assert_eq!(by_name("text.txt").method, Method::Deflate);
+    assert_eq!(by_name("random.bin").method, Method::Store, "不可压缩数据应改为存储");
+
+    // 错密码：设置时或解压时必须报 WrongPassword
+    let wrong = reader.set_password(Some("wrong")).err().or_else(|| reader.extract(None, &mut MemSink::default(), &OpContext::silent()).err());
+    assert!(matches!(wrong, Some(piesi_core::Error::WrongPassword)), "{wrong:?}");
+
+    reader.set_password(Some(password)).unwrap();
+    let mut sink = MemSink::default();
+    reader.extract(None, &mut sink, &OpContext::silent()).unwrap();
+    assert_eq!(sink.files.len(), 4);
+    for (name, crc, n) in &sink.files {
+        let rel = name.split_once('/').map(|(_, r)| r).unwrap_or(name);
+        let original = std::fs::read(src.join(rel)).unwrap();
+        assert_eq!(*n, original.len() as u64, "{name} 大小不符");
+        assert_eq!(*crc, crc32fast::hash(&original), "{name} CRC 不符");
+    }
+
+    // 7zz 交叉验证：能校验、错密码拒绝、解出的内容一致
+    if let Some(sevenz) = ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz"].into_iter().find(|p| Path::new(p).exists()) {
+        let run = |args: &[&str]| Command::new(sevenz).args(args).output().unwrap();
+        let t = run(&["t", &format!("-p{password}"), "-y", out.to_str().unwrap()]);
+        assert!(t.status.success(), "7zz t 失败：{}", String::from_utf8_lossy(&t.stdout));
+        assert!(!run(&["t", "-pwrong", "-y", out.to_str().unwrap()]).status.success(), "7zz 用错密码不该通过");
+        let dest = work.join("7zz-out");
+        let x = run(&["x", &format!("-p{password}"), "-y", &format!("-o{}", dest.display()), out.to_str().unwrap()]);
+        assert!(x.status.success(), "7zz x 失败：{}", String::from_utf8_lossy(&x.stdout));
+        assert_eq!(std::fs::read(dest.join("src/tiny.txt")).unwrap(), b"hi");
+        assert_eq!(std::fs::read(dest.join("src/empty.txt")).unwrap(), b"");
+        assert_eq!(std::fs::read(dest.join("src/sub/random.bin")).unwrap(), random);
+        assert_eq!(std::fs::read(dest.join("src/sub/text.txt")).unwrap(), std::fs::read(src.join("sub/text.txt")).unwrap());
+    }
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+/// 非 ASCII 密码按 UTF-8 字节派生密钥，自己能回读。
+#[test]
+fn aes_non_ascii_password() {
+    let work = workdir("aes-utf8");
+    let src = work.join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    std::fs::write(src.join("a.txt"), "内容 content\n".repeat(100)).unwrap();
+    let out = work.join("enc.zip");
+    let opts = CreateOptions { format: CreateFormat::Zip, level: 1, password: Some("密码 pässwörd".into()), ..Default::default() };
+    create_archive(&out, std::slice::from_ref(&src), &opts, &OpContext::silent()).unwrap();
+    let mut reader = piesi_core::open(&out).unwrap();
+    reader.set_password(Some("密码 pässwörd")).unwrap();
+    let mut sink = MemSink::default();
+    reader.extract(None, &mut sink, &OpContext::silent()).unwrap();
+    assert_eq!(sink.files.len(), 1);
+    assert_eq!(sink.files[0].1, crc32fast::hash(&std::fs::read(src.join("a.txt")).unwrap()));
     std::fs::remove_dir_all(&work).unwrap();
 }

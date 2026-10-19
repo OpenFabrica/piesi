@@ -28,6 +28,8 @@ aes = "=0.9.3"
 hmac = "=0.13.0"
 pbkdf2 = "=0.13.0"
 sha1 = "=0.11.0"
+# zip AES 条目的随机盐（版本与 Cargo.lock 里已有的一致）
+getrandom = "=0.4.3"
 # 编码与文件名
 encoding_rs = "=0.8.42"
 chardetng = "=1.0.0"

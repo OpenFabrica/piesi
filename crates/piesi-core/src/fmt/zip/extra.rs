@@ -39,11 +39,6 @@ impl AesInfo {
     pub fn salt_len(&self) -> usize {
         4 + 4 * self.strength as usize
     }
-
-    /// 密钥长度：强度 1/2/3 对应 16/24/32 字节。
-    pub fn key_len(&self) -> usize {
-        8 + 8 * self.strength as usize
-    }
 }
 
 /// 一次解析的全部结果。
@@ -213,6 +208,6 @@ mod tests {
         let p = parse_extra(&extra, b"", Zip64Need::default());
         assert_eq!(p.aes, Some(AesInfo { vendor_version: 2, strength: 3, method: 8 }));
         assert_eq!(p.aes.unwrap().salt_len(), 16);
-        assert_eq!(p.aes.unwrap().key_len(), 32);
+        assert_eq!(p.aes.unwrap().salt_len(), 16);
     }
 }
