@@ -13,6 +13,13 @@ unRAR 许可允许在任何软件中免费使用（含商用），但有以下�
 
 因此 Piesi 只能解压 RAR，不能创建 RAR。此限制与 MIT/Apache-2.0 并存，只约束 unRAR 相关代码。
 
+## sevenz-rust2（7z 容器，vendor 并打补丁）
+
+`vendor/sevenz-rust2` 是 [sevenz-rust2](https://github.com/hasenbanck/sevenz-rust2) 0.24.1 的源码副本（Apache-2.0，
+许可全文见 `vendor/sevenz-rust2/LICENSE`），根 `Cargo.toml` 用 `[patch.crates-io]` 指向它。
+Piesi 在副本上加了 `liblzma` feature，把 LZMA2 编解码换成 liblzma（0BSD），改动范围和重打方法见
+`vendor/sevenz-rust2/PIESI-PATCH.md`。Apache-2.0 第 4 条要求修改过的文件注明改动，相关改动都带「Piesi 补丁」注释。
+
 ## 其他依赖
 
 其余 Rust 依赖均为 MIT / Apache-2.0 / BSD / 0BSD 许可，完整清单可用 `cargo license` 生成。

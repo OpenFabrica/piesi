@@ -52,3 +52,7 @@ clap = { version = "=4.6.7", features = ["derive"] }
 lto = "thin"
 codegen-units = 1
 debug = 1
+
+# 7z 容器库用 vendor 里打过补丁的副本（LZMA2 编解码走 liblzma），改动见 vendor/sevenz-rust2/PIESI-PATCH.md
+[patch.crates-io]
+sevenz-rust2 = { path = "vendor/sevenz-rust2" }

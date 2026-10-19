@@ -291,7 +291,7 @@ Piesi/
 ### 结论
 - **ZIP 达标**：压缩比 7zz 快 2 倍（自写并行写入器 + zlib-rs），解压持平，体积差 1% 以内。
 - **7z 容器与兼容达标**：7zz 能开 piesi 产物，piesi 能开 7zz 产物（`scripts/smoke.sh`）。
-- **7z 速度没达标**：压缩 big 慢 1.95 倍，解压慢 1.9–2.2 倍。瓶颈是 lzma-rust2 的纯 Rust LZMA2 编解码，单线程吞吐约为 7-Zip 的一半。按 5.1 的预案接 liblzma（vendor/sevenz-rust2 + `[patch.crates-io]`），目标：压缩、解压都 ≤ 7zz × 1.3。
+- **7z 速度没达标（已解决，见下面「liblzma 接管之后」）**：压缩 big 慢 1.95 倍，解压慢 1.9–2.2 倍。瓶颈是 lzma-rust2 的纯 Rust LZMA2 编解码，单线程吞吐约为 7-Zip 的一半。按 5.1 的预案接 liblzma（vendor/sevenz-rust2 + `[patch.crates-io]`），目标：压缩、解压都 ≤ 7zz × 1.3。
 - **7z 大文件体积差 10.7 MB 的根因是分块，不是编码质量**：用 `scripts/lzma2_blocks.py` 走 LZMA2 chunk 链数字典重置：7zz 把 big 切成 17 个 128 MB 独立块，piesi 切成 33 个 64 MB 块（4 × 16 MB 字典）。每个独立块都要重存一份 1 MB 重复数据（约 0.65 MB），多 16 块 ≈ 10.4 MB，和实测差值吻合。mixed 产物只差 0.05%。
 - **内存要加闸**：7z 压缩两边都 4–4.7 GB。7zz 有 memuse 上限会自动减线程；piesi 只限制了 solid 块并发，块内 LZMA2 线程没按内存限制，8 GB 的 Mac 上会被挤爆。处理：每个 worker 按「块 + 输出缓冲 + 编码器内存」计，预算取物理内存的一半，solid 块并发和块内线程共用这个预算。
 
@@ -310,3 +310,23 @@ Piesi/
 ### 其他 P0 指标
 - 10 万条目的 zip 打开并列出全部条目：piesi 0.10 s，7zz 0.24 s（目标 < 200 ms，达标；`--json` 输出 0.58 s 是序列化开销）。
 - ditto / Finder 不写 bit 11 的复核：见 2.2。
+
+### liblzma 接管 LZMA2 之后（2026-10-19 23:01，同一台机器，机器安静）
+
+| 任务 | 7zz 26.04 | piesi（vendor/sevenz-rust2 + liblzma） | 对 7zz |
+|---|---|---|---|
+| 7z 压缩 big | 18.0 s · 4096 MB · 20.37 MB | 14.4 s · 7277 MB · 20.31 MB | 0.80× |
+| 7z 解压 big（7zz 产物） | 0.5 s · 2083 MB | 0.6 s · 1466 MB | 1.2× |
+| 7z 压缩 mixed | 42.8 s · 4386 MB · 852.6 MB | 53.0 s · 7545 MB · 852.6 MB | 1.24× |
+| 7z 解压 mixed（7zz 产物） | 1.1 s · 1836 MB | 1.4 s · 2042 MB | 1.27× |
+
+- 编码器换成 liblzma 的 raw LZMA2 后，big 压缩从 40.6 s 到 14.4 s，体积差消失（字典 32 MB、块 128 MB，与 7zz 一致）。
+- 另一个根因：liblzma-sys 自带的 config.h 没开 `TUKLIB_FAST_UNALIGNED_ACCESS`，匹配比较退化成逐字节循环，单线程慢 2.5 倍。`.cargo/config.toml` 给 C 编译加了这个宏；换构建环境要确认它生效（128 MB 单线程 level 5 约 4 s，没生效约 12 s）。
+- 内存：预算 = 物理内存 / 4，每线程按最坏情况（随机数据）约 625 MB 算：8 GB 机器 3 线程、16 GB 6 线程、48 GB 18 线程。本机 18 线程峰值 7.3 GB，比 7zz 高是因为 7zz 每块用 2 个线程（匹配器单独一个线程），liblzma 没有这个能力；实测常见数据每线程约 360 MB。
+- mixed 仍慢 24%：它八成是随机数据，LZMA 在上面只能逐字面量编码，多线程编码器也没有 7zz 的双线程匹配器。128 MB solid 块只分到 2 个线程时会自动切成「块数 = 线程数」的小块（唯一偏离 7zz 的地方），否则一半核闲着（112.9 s）。
+- 解码：按「字典重置」块并行，超过 256 MB 的块退回流式；解码字典按 folder 解压大小收紧，7z 头里 prop=40 的 4 GB 字典不再换来 4 GB 分配；PPMd 模型内存封顶 2 GiB（它不能收紧）。
+
+### 安全加固（模糊测试，2026-10-19）
+- `fuzz/` 工程（libFuzzer，目标 open_any：打开 → 列目录 → 规划 → 校验）首轮 2 分钟就抓到 .xz 头声明 4 GB 字典的 OOM：tar.xz 与 zip 方法 95 的解码器都加了内存上限（物理内存 / 2，夹在 256 MB–2 GB）。
+- zip 条目的 LZMA / LZMA2 字典按条目大小收紧，7z 的 LZMA1 / LZMA2 字典按 folder 大小收紧；PPMd 内存只能封顶。
+- 样本存 `fuzz/regressions/`，`cargo test` 逐个回放（不 panic、5 秒内结束）。

@@ -37,7 +37,9 @@ serde_json.workspace = true
 tracing.workspace = true
 
 [features]
-default = []
+default = ["sevenz-liblzma"]
+# 7z 的 LZMA2 编解码走 liblzma（vendor/sevenz-rust2 的补丁）；关掉就退回 lzma-rust2 的纯 Rust 实现
+sevenz-liblzma = ["sevenz-rust2/liblzma"]
 # 纯 Rust LZMA 备胎（P0 基准用），默认走 liblzma
 lzma-pure = []
 

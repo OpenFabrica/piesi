@@ -1,0 +1,6 @@
+# liblzma-sys 自带的 config.h 没有打开 TUKLIB_FAST_UNALIGNED_ACCESS：LZMA 编码器比较匹配长度时退化成逐字节循环，
+# 7z/xz 压缩慢 2.5 倍（128 MB 单线程实测 12.3 s → 4.7 s）。arm64 与 x86_64 都支持快速非对齐访问，直接给 C 编译器加宏。
+# cc crate 会读 CFLAGS_<目标三元组>（连字符换成下划线），只影响 build script 编译的 C 代码。
+[env]
+CFLAGS_aarch64_apple_darwin = "-DTUKLIB_FAST_UNALIGNED_ACCESS=1"
+CFLAGS_x86_64_apple_darwin = "-DTUKLIB_FAST_UNALIGNED_ACCESS=1"

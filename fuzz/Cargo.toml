@@ -22,3 +22,7 @@ bench = false
 
 # 单独成一个 workspace，不进根 workspace（根 Cargo.lock 不受影响）
 [workspace]
+
+# 根 Cargo.toml 的 patch 段对这个独立 workspace 不生效，这里要再写一遍，否则 piesi-core 的 sevenz-liblzma feature 找不到
+[patch.crates-io]
+sevenz-rust2 = { path = "../vendor/sevenz-rust2" }
