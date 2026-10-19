@@ -9,6 +9,7 @@ final class TaskItem: Identifiable {
     enum Kind {
         case extract
         case create
+        case verify
     }
 
     enum State: Equatable {
@@ -56,6 +57,15 @@ final class TaskItem: Identifiable {
 
     var isFinished: Bool {
         state != .running
+    }
+
+    /// 浮窗里的图标
+    var iconName: String {
+        switch kind {
+        case .extract: "arrow.down.doc"
+        case .create: "doc.zipper"
+        case .verify: "checkmark.shield"
+        }
     }
 
     /// 收到 Rust 的进度快照（已节流到 ≥50 ms）。速度做指数平滑，否则数字每次都跳。

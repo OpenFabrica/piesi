@@ -1,0 +1,153 @@
+// BrowserModel.swift —— 浏览窗口的状态：句柄、密码、编码、搜索、选中。列表数据由 outline 按层级向句柄拉取，Swift 不持有整棵树。
+import AppKit
+import Observation
+
+/// 浏览窗口模型。句柄只做列表 / 搜索 / 预览；真正解压由 ExtractCoordinator 另开句柄。
+@MainActor
+@Observable
+final class BrowserModel {
+    let url: URL
+    private(set) var handle: ArchiveHandle?
+    private(set) var formatName = ""
+    private(set) var entryCount: UInt32 = 0
+    /// 文件原始大小之和（Rust 的 totalSize）
+    private(set) var totalBytes: UInt64?
+    private(set) var encodingInfo: EncodingInfo?
+    private(set) var passwordState: PasswordState = .notNeeded
+    private(set) var errorMessage: String?
+    /// 用户输入过并验证通过的密码，预览 / 拖出 / 解压沿用
+    private(set) var password: String?
+    /// 搜索框文字；非空时列表变成平铺结果
+    var searchQuery = ""
+    /// 当前选中的行（outline 回写）
+    var selectedRows: [Row] = []
+    /// 每加一次，outline 就丢掉缓存重新拉根目录（切编码后）
+    private(set) var reloadToken = 0
+
+    init(url: URL) {
+        self.url = url
+    }
+
+    var isLoaded: Bool {
+        handle != nil
+    }
+
+    /// 后台打开；头加密（forNames）的包先要密码，forData 留到预览 / 解压时再要。
+    func load(parent: NSWindow?) async {
+        let name = url.lastPathComponent
+        do {
+            let opened = try await CoreBridge.open(url)
+            if opened.passwordState() == .forNames {
+                guard await askPassword(for: opened, name: name, parent: parent) else {
+                    errorMessage = "需要密码才能列出内容"
+                    return
+                }
+            }
+            handle = opened
+            formatName = opened.formatName()
+            entryCount = opened.entryCount()
+            encodingInfo = opened.encodingInfo()
+            passwordState = opened.passwordState()
+            totalBytes = opened.totalSize()
+            Log.browser.notice("opened \(self.url.path, privacy: .public) format=\(self.formatName, privacy: .public) entries=\(self.entryCount)")
+        } catch {
+            errorMessage = CoreBridge.message(for: error)
+            Log.browser.error("open failed \(self.url.path, privacy: .public): \(self.errorMessage ?? "", privacy: .public)")
+        }
+    }
+
+    /// 切换编码：只重解码不重读包，然后让列表重拉。
+    func setEncoding(_ encoding: Encoding) {
+        guard let handle else { return }
+        handle.setEncoding(encoding: encoding)
+        encodingInfo = handle.encodingInfo()
+        reloadToken += 1
+        Log.browser.notice("encoding → \(encoding.shortName, privacy: .public)")
+    }
+
+    /// forData 的包在预览 / 拖出前要密码；已经有就直接通过。
+    func ensurePassword(parent: NSWindow?) async -> Bool {
+        guard let handle else { return false }
+        if passwordState == .notNeeded || password != nil {
+            return true
+        }
+        return await askPassword(for: handle, name: url.lastPathComponent, parent: parent)
+    }
+
+    /// 解压时才发现密码不对（forData 的包 setPassword 验不出来）：清掉，下次再问。
+    func forgetPassword() {
+        password = nil
+    }
+
+    /// 反复要密码直到通过或取消。
+    private func askPassword(for handle: ArchiveHandle, name: String, parent: NSWindow?) async -> Bool {
+        var wrong = false
+        while true {
+            guard let entered = await PasswordDialog.ask(archiveName: name, wrongBefore: wrong, parent: parent) else { return false }
+            do {
+                try await CoreBridge.setPassword(handle, entered)
+                password = entered
+                return true
+            } catch {
+                guard CoreBridge.isWrongPassword(error) else {
+                    errorMessage = CoreBridge.message(for: error)
+                    return false
+                }
+                wrong = true
+            }
+        }
+    }
+
+    /// 解压时沿用的编码 / 密码。
+    var presets: ExtractPresets {
+        ExtractPresets(encoding: encodingInfo?.encoding, password: password)
+    }
+
+    /// 把选中行转成可解压的 id。合成目录（id == max）没有真实条目，换成它下面所有子项的 id；
+    /// 真实目录只给自己的 id，Rust 会连同子树一起解。
+    func extractionIDs(for rows: [Row]) -> [UInt32] {
+        guard let handle else { return [] }
+        var ids: [UInt32] = []
+        for row in rows {
+            if row.id == UInt32.max {
+                ids.append(contentsOf: Self.collectIDs(handle, dir: row.path))
+            } else {
+                ids.append(row.id)
+            }
+        }
+        return ids
+    }
+
+    /// 递归收集某个合成目录下的真实条目 id（拖出和解压选中共用，拖出在后台线程调）。
+    nonisolated static func collectIDs(_ handle: ArchiveHandle, dir: String) -> [UInt32] {
+        var ids: [UInt32] = []
+        for child in handle.listDir(dir: dir) {
+            if child.id == UInt32.max {
+                ids.append(contentsOf: collectIDs(handle, dir: child.path))
+            } else {
+                ids.append(child.id)
+            }
+        }
+        return ids
+    }
+
+    /// 顶栏常驻的「文件名编码：GB18030（自动）」
+    var encodingLabel: String {
+        guard let info = encodingInfo else { return "文件名编码" }
+        let how = info.source == "manual" ? "手动" : "自动"
+        return "文件名编码：\(info.encoding.shortName)（\(how)）"
+    }
+
+    /// 底栏：条目数、总大小、格式、是否加密
+    var bottomBarText: String {
+        var parts = ["\(entryCount) 个条目"]
+        if let totalBytes {
+            parts.append(ByteText.string(totalBytes))
+        }
+        parts.append(formatName)
+        if passwordState != .notNeeded {
+            parts.append("密码保护")
+        }
+        return parts.joined(separator: " · ")
+    }
+}

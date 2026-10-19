@@ -74,7 +74,7 @@ struct TaskRowView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Image(systemName: task.kind == .extract ? "arrow.down.doc" : "doc.zipper")
+            Image(systemName: task.iconName)
                 .font(.title2)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 3) {

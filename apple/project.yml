@@ -25,7 +25,7 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     # Info.plist 手写（放在各 target 目录），不让 Xcode 自动生成
     GENERATE_INFOPLIST_FILE: NO
-    # Rust 静态库里有 unrar 的 C++ 代码（cc crate 编的），最终链接要带 libc++
+    # Rust 静态库里有 unrar_sys 编的 C++ 代码（RARLAB 的 unrar 源码），最终链接要带 libc++
     OTHER_LDFLAGS: -lc++
 
 targets:

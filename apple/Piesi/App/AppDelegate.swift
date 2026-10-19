@@ -62,6 +62,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    /// 退出时清掉 Quick Look 预览用的临时目录（Rust 写在 temp/piesi-preview-<pid>/）。
+    func applicationWillTerminate(_ notification: Notification) {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("piesi-preview-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        try? FileManager.default.removeItem(at: dir)
+    }
+
     /// 自动退出由 maybeAutoQuit 决定，不用系统的「最后一个窗口关闭就退出」。
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false

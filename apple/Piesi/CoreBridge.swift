@@ -49,6 +49,13 @@ enum CoreBridge {
         }.value
     }
 
+    /// 校验：解码 + CRC，不写盘；损坏抛 PiesiError。
+    static func verify(_ handle: ArchiveHandle, ids: [UInt32], listener: ProgressListener, cancel: CancelHandle) async throws -> VerifyResult {
+        try await Task.detached(priority: .userInitiated) {
+            try handle.verify(ids: ids, listener: listener, cancel: cancel)
+        }.value
+    }
+
     /// 单个条目解到临时文件（Quick Look / 用默认 app 打开用）。
     static func extractToTemp(_ handle: ArchiveHandle, id: UInt32, cancel: CancelHandle) async throws -> URL {
         let path = try await Task.detached(priority: .userInitiated) {
