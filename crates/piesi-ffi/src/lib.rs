@@ -280,6 +280,19 @@ impl ArchiveHandle {
         self.inner.lock().unwrap().entries().len() as u32
     }
 
+    /// `dir` 下（含所有子目录）全部条目的 id，一次遍历；dir 传 "" 是整包。
+    /// 给「解压选中的目录」收集条目用：在 Swift 里递归 list_dir 每层都要全量扫一遍，10 万条目会卡主线程。
+    pub fn ids_under(&self, dir: String) -> Vec<u32> {
+        let a = self.inner.lock().unwrap();
+        let prefix = if dir.is_empty() { String::new() } else { format!("{}/", dir.trim_matches('/')) };
+        a.names()
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| prefix.is_empty() || n.starts_with(&prefix))
+            .map(|(i, _)| i as u32)
+            .collect()
+    }
+
     /// 全部文件条目的原始大小之和（目录、链接不算），给摘要行用。
     pub fn total_size(&self) -> u64 {
         let a = self.inner.lock().unwrap();

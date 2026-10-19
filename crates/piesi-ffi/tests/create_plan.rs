@@ -80,6 +80,11 @@ fn create_then_plan_and_extract_zip() {
     assert!(plan.archive_bytes > 0);
     assert!(plan.entries >= 3, "至少 源/、中文.txt、子目录/、b.bin 中的 3 项，实际 {}", plan.entries);
 
+    // ids_under：目录下全部条目（含目录自身），整包 = 全部
+    let under = archive.ids_under("源/子目录".into());
+    assert!(!under.is_empty() && under.len() < archive.entry_count() as usize, "{under:?}");
+    assert_eq!(archive.ids_under(String::new()).len(), archive.entry_count() as usize);
+
     let result = archive.extract(extract_req, Arc::new(Quiet), CancelHandle::new()).unwrap();
     assert_eq!(result.root, plan.root);
     assert_eq!(find_file(&out, "中文.txt").unwrap(), b"hello");
