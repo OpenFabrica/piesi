@@ -10,7 +10,6 @@ repository.workspace = true
 [dependencies]
 zip.workspace = true
 sevenz-rust2.workspace = true
-unrar.workspace = true
 unrar_sys.workspace = true
 tar.workspace = true
 flate2.workspace = true

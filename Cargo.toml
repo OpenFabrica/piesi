@@ -13,8 +13,7 @@ repository = "https://github.com/rambocode/piesi"
 [workspace.dependencies]
 # 格式与编解码
 zip = { version = "=9.0.5", default-features = false, features = ["deflate", "aes-crypto", "time"] }
-sevenz-rust2 = { version = "=0.24.1", default-features = false, features = ["aes256", "compress", "util"] }
-unrar = "=0.5.8"
+sevenz-rust2 = { version = "=0.24.1", default-features = false, features = ["aes256", "compress", "util", "ppmd", "bzip2", "deflate", "zstd"] }
 unrar_sys = "=0.5.8"
 tar = "=0.4.46"
 flate2 = "=1.1.10"

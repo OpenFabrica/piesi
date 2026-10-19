@@ -120,6 +120,8 @@ impl SevenZReader {
             }
         }
         // 进度总量 = 真正要解码的字节：每块从块首到最后一个选中条目，中间跳过的也算
+        // （跳过条目解码丢弃时同样走 CountingReader 计入 done_bytes，进度条不会长时间不动）；
+        // 最后一个选中条目之后的不解，所以不计入
         let mut total_bytes = 0u64;
         for (b, last) in last_needed.iter().enumerate() {
             if let Some(last) = last {
@@ -291,7 +293,7 @@ impl ArchiveReader for SevenZReader {
 
 /// 条目类型与 Unix mode：7-Zip 在 Windows 属性高 16 位带 st_mode（0x8000 标记），S_IFLNK 就是符号链接。
 fn kind_and_mode(f: &sevenz_rust2::ArchiveEntry) -> (EntryKind, Option<u32>) {
-    let mode = (f.has_windows_attributes && f.windows_attributes & FILE_ATTRIBUTE_UNIX_EXTENSION != 0).then(|| f.windows_attributes >> 16);
+    let mode = (f.has_windows_attributes && f.windows_attributes & FILE_ATTRIBUTE_UNIX_EXTENSION != 0).then_some(f.windows_attributes >> 16);
     let kind = if f.is_directory {
         EntryKind::Dir
     } else if mode.is_some_and(|m| m & 0o170000 == 0o120000) {

@@ -22,6 +22,8 @@ use crate::{Error, Result};
 const CHUNK: usize = 256 * 1024;
 /// 通道深度：生产者最多领先消费者这么多块，再多就阻塞（背压）。
 const CHANNEL_DEPTH: usize = 8;
+/// solid 包里跳过条目时，解码丢弃的字节攒到这么多才报一次进度。
+const SKIP_REPORT_CHUNK: u64 = 1024 * 1024;
 /// 符号链接目标长度上限（RAR4 把目标存成文件内容）。
 const MAX_SYMLINK_TARGET: usize = 64 * 1024;
 /// 读头时给 unrar 的链接目标缓冲长度（宽字符数），RAR 路径上限 2048。
@@ -162,26 +164,32 @@ impl ArchiveReader for RarReader {
             return Err(Error::PasswordRequired);
         }
 
-        // 工作线程的处理计划：每个条目跳过 / 只报元数据 / 流式送数据
+        // 工作线程的处理计划：每个条目跳过 / 只报元数据 / 流式送数据；处理到最后一个选中条目就停
         let mut plan = Vec::with_capacity(self.entries.len());
-        let mut total_bytes = 0u64;
         let mut total_entries = 0u64;
-        for (i, entry) in self.entries.iter().enumerate() {
+        let mut stop_after = None;
+        for (i, _) in self.entries.iter().enumerate() {
             if !selected[i] {
                 plan.push(Action::Skip);
                 continue;
             }
             total_entries += 1;
-            let action = match self.kinds[i] {
-                RarKind::Regular => {
-                    total_bytes += entry.size;
-                    Action::Stream
-                }
+            stop_after = Some(i);
+            plan.push(match self.kinds[i] {
+                RarKind::Regular => Action::Stream,
                 RarKind::SymlinkData => Action::Link,
                 _ => Action::Meta,
-            };
-            plan.push(action);
+            });
         }
+        // 进度总量按「需要解码的字节」算：solid 包里最后一个选中条目之前的所有文件都得解码
+        // （跳过的也经回调计入进度），非 solid 包跳过只是 seek，只算选中的
+        let total_bytes: u64 = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| self.kinds[*i] == RarKind::Regular && (selected[*i] || (self.solid && stop_after.is_some_and(|last| *i < last))))
+            .map(|(_, e)| e.size)
+            .sum();
 
         let (tx, rx) = mpsc::sync_channel::<Msg>(CHANNEL_DEPTH);
         let stop = Arc::new(AtomicBool::new(false));
@@ -189,6 +197,7 @@ impl ArchiveReader for RarReader {
             path: self.path.clone(),
             password: self.password.clone(),
             plan,
+            stop_after,
             solid: self.solid,
             tx,
             stop: Arc::clone(&stop),
@@ -252,6 +261,8 @@ enum Msg {
     End(usize, std::result::Result<(), RarCode>),
     /// 跳过的条目出了错（solid 包里跳过也要解码），只当警告。
     Warning(usize, RarCode),
+    /// solid 包里跳过条目时解码并丢弃的字节数，消费端计入进度，免得进度条长时间不动。
+    Skipped(u64),
     /// 全部处理完，带最终结果。
     Finished(Result<()>),
 }
@@ -324,6 +335,8 @@ fn consume(rx: &Receiver<Msg>, entries: &[Entry], kinds: &[RarKind], sink: &mut 
                 let name = entries.get(i).map(progress_name).unwrap_or_default();
                 report.warnings.push(format!("{name}：跳过时解码出错（{code:?}），未选中，忽略"));
             }
+            // 跳过的字节也算进度，同时充当取消检查点
+            Msg::Skipped(n) => throttle.add_bytes(n)?,
             Msg::Finished(result) => {
                 result?;
                 return Ok(report);
@@ -374,6 +387,8 @@ struct Worker {
     path: PathBuf,
     password: Option<String>,
     plan: Vec<Action>,
+    /// 最后一个选中条目的下标，处理完它就不再往下读；None 表示什么都没选。
+    stop_after: Option<usize>,
     solid: bool,
     tx: SyncSender<Msg>,
     stop: Arc<AtomicBool>,
@@ -390,6 +405,7 @@ impl Worker {
             password: self.password.clone(),
             discard: false,
             aborted: false,
+            skipped_pending: 0,
         };
         let result = self.process_all(&mut state);
         let _ = self.tx.send(Msg::Finished(result));
@@ -403,6 +419,10 @@ impl Worker {
         let mut index = 0usize;
         let mut scratch = ScratchDir::default();
         loop {
+            // 最后一个选中条目之后的都不用碰（solid 包里继续读只是白白解码）
+            if self.stop_after.is_none_or(|last| index > last) {
+                break;
+            }
             if hd.read(&handle).map_err(|c| map_code(c, Stage::Read, self.password.is_some()))?.is_none() {
                 break;
             }
@@ -448,6 +468,11 @@ impl Worker {
         state.discard = false;
         if state.aborted {
             return Err(abort_reason(&self.cancel));
+        }
+        // 回调里攒下的零头也要报出去，进度才能对上总量
+        let pending = std::mem::take(&mut state.skipped_pending);
+        if pending > 0 {
+            self.send(Msg::Skipped(pending))?;
         }
         if let Err(code) = r {
             // 没选中的条目坏了不影响用户要的文件：只当警告，继续
@@ -546,12 +571,22 @@ struct CallbackState {
     discard: bool,
     /// 回调已返回 -1 让 unrar 中止。
     aborted: bool,
+    /// 丢弃模式下攒着还没报给消费端的字节数，攒够 SKIP_REPORT_CHUNK 才发一条消息。
+    skipped_pending: u64,
 }
 
 impl CallbackState {
     /// 列目录用的状态：没有数据通道，不可取消。
     fn for_listing(password: Option<String>) -> Self {
-        Self { tx: None, stop: Arc::new(AtomicBool::new(false)), cancel: CancelToken::new(), password, discard: true, aborted: false }
+        Self {
+            tx: None,
+            stop: Arc::new(AtomicBool::new(false)),
+            cancel: CancelToken::new(),
+            password,
+            discard: true,
+            aborted: false,
+            skipped_pending: 0,
+        }
     }
 }
 
@@ -569,10 +604,22 @@ extern "C" fn rar_callback(msg: sys::UINT, user_data: sys::LPARAM, p1: sys::LPAR
                 state.aborted = true;
                 return -1;
             }
-            if state.discard || p2 <= 0 {
+            if p2 <= 0 {
                 return 0;
             }
             let Some(tx) = &state.tx else { return 0 };
+            if state.discard {
+                // 解码后丢弃的字节也要计入进度，攒够一块再发，免得消息太密
+                state.skipped_pending += p2 as u64;
+                if state.skipped_pending >= SKIP_REPORT_CHUNK {
+                    let n = std::mem::take(&mut state.skipped_pending);
+                    if tx.send(Msg::Skipped(n)).is_err() {
+                        state.aborted = true;
+                        return -1;
+                    }
+                }
+                return 0;
+            }
             // SAFETY：unrar 保证 p1 指向 p2 个有效字节，仅在回调期间有效，这里立即拷走。
             let data = unsafe { std::slice::from_raw_parts(p1 as *const u8, p2 as usize) };
             for chunk in data.chunks(CHUNK) {

@@ -65,6 +65,29 @@ fn solid_selective_extract() {
     }
 }
 
+/// solid 包里只选最后一个文件：前面跳过的条目 unrar 照样解码，丢弃的字节也计入进度，结束时 done == total。
+#[test]
+fn solid_skip_counts_progress() {
+    for name in ["solid5.rar", "solid4.rar"] {
+        let mut r = open(name);
+        let members: Vec<_> = r.entries().iter().filter(|e| e.kind == EntryKind::File && e.size > 0).map(|e| e.id).collect();
+        assert!(members.len() >= 2, "{name}");
+        check_solid_skip_progress(&mut r, &members);
+    }
+}
+
+/// 非 solid 包只选一个文件：跳过只是 seek，进度总量就是该文件大小。
+#[test]
+fn nonsolid_skip_is_free() {
+    let mut r = open("rar5.rar");
+    let id = find(&r, "bin/tiny.exe").id;
+    let (sink, events) = extract_ids_with_progress(&mut r, Some(&[id]));
+    assert_eq!(sink.files.get("bin/tiny.exe"), Some(&tiny_exe()));
+    let last = events.last().unwrap();
+    assert_eq!(last.total_bytes, Some(tiny_exe().len() as u64));
+    assert_eq!(last.done_bytes, tiny_exe().len() as u64);
+}
+
 /// 存储（m0）方法映射成 Store。
 #[test]
 fn store_method() {

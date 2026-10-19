@@ -71,6 +71,16 @@ fn solid_selective_extract_skips_unselected() {
     assert_eq!(sink.files.get("bin/tiny.exe"), Some(&tiny_exe()));
 }
 
+/// solid 块里只选最后一个文件：前面跳过的条目解码丢弃的字节也计入进度，结束时 done == total。
+#[test]
+fn solid_skip_counts_progress() {
+    let mut r = open("solid.7z");
+    let group = find(&r, "bin/tiny.exe").solid_group.expect("solid group");
+    let members: Vec<_> = r.entries().iter().filter(|e| e.solid_group == Some(group)).map(|e| e.id).collect();
+    assert!(members.len() >= 2);
+    check_solid_skip_progress(&mut r, &members);
+}
+
 /// read_entry 走同一套逻辑，拿到单个文件内容。
 #[test]
 fn read_entry_single_file() {

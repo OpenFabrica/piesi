@@ -16,6 +16,8 @@
 
 - 构建与测试核心：`cargo build --workspace` / `cargo test --workspace`
 - 生成语料：`python3 -I scripts/gen_corpus.py tests/corpus`
+- 端到端冒烟（与 7zz/unzip/bsdtar 交叉验证）：`scripts/smoke.sh`
+- 性能基准（对比 7zz，结果追加到 bench/results.md）：`scripts/bench.sh [mixed|big|all]`
 - 构建 XCFramework：`scripts/build-core.sh`
 - 生成 Xcode 工程：`cd apple && xcodegen generate`
 - 打包签名公证：`scripts/package.sh`（签名身份与公证 profile 见 `~/.claude/docs/apple-signing.md`）

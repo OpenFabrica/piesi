@@ -162,11 +162,30 @@ pub fn assert_cancelled(reader: &mut dyn ArchiveReader) {
 
 /// 带进度解压全部，返回收到的事件。
 pub fn extract_with_progress(reader: &mut dyn ArchiveReader) -> (MemSink, Vec<ProgressEvent>) {
+    extract_ids_with_progress(reader, None)
+}
+
+/// 带进度解压指定条目（None 为全部），返回收到的事件。
+pub fn extract_ids_with_progress(reader: &mut dyn ArchiveReader, ids: Option<&[EntryId]>) -> (MemSink, Vec<ProgressEvent>) {
     let token = CancelToken::new();
     let progress = RecordingProgress::default();
     let ctx = OpContext::new(&progress, &token);
     let mut sink = MemSink::default();
-    reader.extract(None, &mut sink, &ctx).expect("extract with progress");
+    reader.extract(ids, &mut sink, &ctx).expect("extract with progress");
     let events = progress.0.into_inner().unwrap();
     (sink, events)
+}
+
+/// 在 solid 组里只选最后一个文件条目，验证进度把跳过的（解码丢弃的）字节也算进去：
+/// total 等于该条目及其前面所有同组文件的展开大小之和，结束时 done == total。
+pub fn check_solid_skip_progress(reader: &mut dyn ArchiveReader, group_entries: &[EntryId]) {
+    let last = *group_entries.iter().max().expect("solid 组非空");
+    let expected: u64 = reader.entries().iter().filter(|e| group_entries.contains(&e.id) && e.id <= last).map(|e| e.size).sum();
+    let last_size = reader.entries()[last as usize].size;
+    assert!(expected > last_size, "组里应该有要跳过的前置条目：expected={expected} last={last_size}");
+    let (sink, events) = extract_ids_with_progress(reader, Some(&[last]));
+    assert_eq!(sink.files.len(), 1);
+    let final_event = events.last().expect("至少一次进度");
+    assert_eq!(final_event.total_bytes, Some(expected));
+    assert_eq!(final_event.done_bytes, expected);
 }

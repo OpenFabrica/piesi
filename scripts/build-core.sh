@@ -58,6 +58,9 @@ esac
 
 # 独立 target 目录，和 cargo test（target/）隔开；允许外部覆盖
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target/apple}"
+# 最低系统版本必须和 apple/project.yml 的 deploymentTarget 一致：rustc 和 cc 编的 C 代码（liblzma、zstd、BCJ 滤镜）都读这个变量。
+# 不设的话 cc 按当前 SDK（27.0）打标记，Xcode 链接时每个 C 目标文件都警告 "built for newer macOS"，app 在 macOS 14 上也可能跑不起来。
+export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-14.0}"
 SYSROOT="$(rustc --print sysroot)"
 for t in "${TRIPLES[@]}"; do
   [[ -d "$SYSROOT/lib/rustlib/$t/lib" ]] || die "当前工具链（${SYSROOT}）没有目标 ${t} 的 std，执行：rustup target add ${t}"
