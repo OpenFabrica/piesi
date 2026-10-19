@@ -74,7 +74,6 @@ struct CompressDialogView: View {
     let sources: [URL]
     let finish: @MainActor (CompressOptions?) -> Void
 
-    @State private var preset: CompressPreset? = .windows
     @State private var format: CreateFormat = .zip
     @State private var level: Double = 5
     @State private var password = ""
@@ -96,6 +95,15 @@ struct CompressDialogView: View {
         _baseName = State(initialValue: name.isEmpty ? "压缩包" : name)
     }
 
+    /// 当前高亮的预设：按格式 / 级别 / 安全名 / 文件名加密反推，哪张卡片的值全对上就是哪张。
+    /// 不用 @State 存：之前 apply() 先改值再设 preset，各个 onChange 在下一轮视图更新才跑，最后把 preset 清成了 nil。
+    private var preset: CompressPreset? {
+        CompressPreset.allCases.first {
+            $0.format == format && Int($0.level) == Int(level) && $0.windowsSafe == windowsSafe && $0.encryptNames == encryptNames
+        }
+    }
+
+    /// 完整文件名：基础名 + 当前格式的扩展名
     private var fileName: String {
         "\(baseName).\(formatExtension(format: format))"
     }
@@ -113,16 +121,19 @@ struct CompressDialogView: View {
         return candidate
     }
 
+    /// 两次密码不一致（只在填了密码时算）
     private var passwordMismatch: Bool {
         !password.isEmpty && password != passwordConfirm
     }
 
+    /// 能否按「压缩」：名字非空、密码一致；要加密文件名就必须有密码，否则会得到没加密的 7z。
     private var canSubmit: Bool {
         guard !baseName.trimmingCharacters(in: .whitespaces).isEmpty, !passwordMismatch else { return false }
-        if preset == .encrypted, password.isEmpty { return false }
+        if encryptNames, password.isEmpty { return false }
         return true
     }
 
+    /// 顶部的来源摘要：最多列 3 个名字
     private var sourceSummary: String {
         let names = sources.prefix(3).map(\.lastPathComponent).joined(separator: "、")
         return sources.count > 3 ? "\(names) 等 \(sources.count) 项" : names
@@ -246,7 +257,6 @@ struct CompressDialogView: View {
                 }
                 .labelsHidden()
                 .frame(width: 140)
-                .onChange(of: format) { _, _ in preset = nil }
             }
             GridRow {
                 Text("级别")
@@ -258,7 +268,6 @@ struct CompressDialogView: View {
                     Text("小")
                 }
                 .frame(width: 220)
-                .onChange(of: level) { _, _ in preset = nil }
                 Text("\(Int(level))")
                     .monospacedDigit()
             }
@@ -291,12 +300,11 @@ struct CompressDialogView: View {
             GridRow {
                 Text("")
                 Toggle("文件名改成 Windows 安全名", isOn: $windowsSafe)
-                    .onChange(of: windowsSafe) { _, _ in preset = nil }
             }
         }
     }
 
-    /// 套预设：格式、级别、安全名、文件名加密；非加密预设清掉密码。
+    /// 套预设：格式、级别、安全名、文件名加密；非加密预设清掉密码，加密预设展开「高级」让用户填密码。
     private func apply(_ candidate: CompressPreset) {
         format = candidate.format
         level = candidate.level
@@ -308,10 +316,9 @@ struct CompressDialogView: View {
         } else {
             showAdvanced = true
         }
-        // 上面几处 onChange 会把 preset 清成 nil，最后再设回来
-        preset = candidate
     }
 
+    /// 「选择…」：选输出目录。面板挂在对话框窗口上当 sheet，没有键窗口时退回独立面板。
     private func chooseDirectory() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -320,12 +327,21 @@ struct CompressDialogView: View {
         panel.directoryURL = directory
         panel.prompt = "选择"
         Task { @MainActor in
-            if await panel.begin() == .OK, let url = panel.url {
+            let response: NSApplication.ModalResponse
+            if let window = NSApp.keyWindow {
+                response = await panel.beginSheetModal(for: window)
+            } else {
+                response = await panel.begin()
+            }
+            if response == .OK, let url = panel.url {
                 directory = url
             }
         }
     }
 
+    /// 「压缩」：把界面状态收成 CompressOptions 交回。
+    /// encryptNames 再推一遍而不是直接用开关值：开关可能在禁用状态下还留着 true（先选加密再改成 zip、或删掉密码），
+    /// Rust 收到「加密文件名但没密码」会报错，这里保证只有 7z + 有密码时才为真。
     private func submit() {
         let options = CompressOptions(
             destination: destination,
