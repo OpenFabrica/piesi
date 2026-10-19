@@ -1,4 +1,14 @@
 //! UniFFI 导出层：只放导出函数和跨语言的 record/enum，不放逻辑。
+//! 门面对象内部用 Mutex 包住 `Archive`（驱动是 Send 不是 Sync），长操作由调用方放到后台线程。
+
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+use piesi_core::encoding::NameEncoding;
+use piesi_core::facade::Archive;
+use piesi_core::plan::{ConflictPolicy, ExtractOptions};
+use piesi_core::progress::{CancelToken, OpContext, Progress, ProgressEvent};
+use piesi_core::{EntryKind, PasswordNeed};
 
 uniffi::setup_scaffolding!();
 
@@ -8,11 +18,416 @@ pub fn core_version() -> String {
     env!("CARGO_PKG_VERSION").to_owned()
 }
 
-/// 识别文件格式名；认不出返回 None。P0 用它验证从 Swift 调 Rust 的整条链路。
+/// 识别文件格式名；认不出返回 None。
 #[uniffi::export]
 pub fn detect_format_name(path: String) -> Option<String> {
-    piesi_core::detect_format(std::path::Path::new(&path))
-        .ok()
-        .flatten()
-        .map(|f| f.display_name().to_owned())
+    piesi_core::detect_format(Path::new(&path)).ok().flatten().map(|f| f.display_name().to_owned())
+}
+
+/// 跨语言错误。
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum PiesiError {
+    #[error("无法识别的压缩格式")]
+    UnknownFormat,
+    #[error("需要密码")]
+    PasswordRequired,
+    #[error("密码错误")]
+    WrongPassword,
+    #[error("已取消")]
+    Cancelled,
+    #[error("{message}")]
+    Other { message: String },
+}
+
+impl From<piesi_core::Error> for PiesiError {
+    fn from(e: piesi_core::Error) -> Self {
+        match e {
+            piesi_core::Error::UnknownFormat => PiesiError::UnknownFormat,
+            piesi_core::Error::PasswordRequired => PiesiError::PasswordRequired,
+            piesi_core::Error::WrongPassword => PiesiError::WrongPassword,
+            piesi_core::Error::Cancelled => PiesiError::Cancelled,
+            other => PiesiError::Other { message: other.to_string() },
+        }
+    }
+}
+
+/// 文件名编码（和核心的 NameEncoding 一一对应）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum Encoding {
+    Utf8,
+    Gb18030,
+    Big5,
+    ShiftJis,
+    EucKr,
+    Cp1251,
+    Cp866,
+    Cp1252,
+}
+
+impl From<Encoding> for NameEncoding {
+    fn from(e: Encoding) -> Self {
+        match e {
+            Encoding::Utf8 => NameEncoding::Utf8,
+            Encoding::Gb18030 => NameEncoding::Gb18030,
+            Encoding::Big5 => NameEncoding::Big5,
+            Encoding::ShiftJis => NameEncoding::ShiftJis,
+            Encoding::EucKr => NameEncoding::EucKr,
+            Encoding::Cp1251 => NameEncoding::Cp1251,
+            Encoding::Cp866 => NameEncoding::Cp866,
+            Encoding::Cp1252 => NameEncoding::Cp1252,
+        }
+    }
+}
+
+impl From<NameEncoding> for Encoding {
+    fn from(e: NameEncoding) -> Self {
+        match e {
+            NameEncoding::Utf8 => Encoding::Utf8,
+            NameEncoding::Gb18030 => Encoding::Gb18030,
+            NameEncoding::Big5 => Encoding::Big5,
+            NameEncoding::ShiftJis => Encoding::ShiftJis,
+            NameEncoding::EucKr => Encoding::EucKr,
+            NameEncoding::Cp1251 => Encoding::Cp1251,
+            NameEncoding::Cp866 => Encoding::Cp866,
+            NameEncoding::Cp1252 => Encoding::Cp1252,
+        }
+    }
+}
+
+/// 编码识别结果。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct EncodingInfo {
+    pub encoding: Encoding,
+    pub confidence: f32,
+    /// "format" / "utf8" / "scored" / "manual"
+    pub source: String,
+    pub ambiguous: bool,
+}
+
+/// 条目类型。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum Kind {
+    File,
+    Dir,
+    Symlink,
+}
+
+/// 列表里的一行。目录层级由 `list_dir` 现算，UI 不持有整棵树。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct Row {
+    pub id: u32,
+    /// 最后一段名字
+    pub name: String,
+    /// 完整包内路径
+    pub path: String,
+    pub kind: Kind,
+    pub size: u64,
+    pub packed_size: Option<u64>,
+    pub mtime: Option<i64>,
+    pub encrypted: bool,
+    pub method: String,
+    /// 目录行：下面有多少个直接子项
+    pub child_count: u32,
+}
+
+/// 密码需求。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum PasswordState {
+    NotNeeded,
+    ForData,
+    ForNames,
+}
+
+/// 冲突策略。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum Conflict {
+    Overwrite,
+    Skip,
+    Rename,
+}
+
+/// 解压选项。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct ExtractRequest {
+    pub dest: String,
+    pub smart_folder: bool,
+    pub conflict: Conflict,
+    pub skip_junk: bool,
+    /// 空 = 全部
+    pub ids: Vec<u32>,
+}
+
+/// 解压结果。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct ExtractResult {
+    pub root: String,
+    pub extracted: u64,
+    pub skipped: u64,
+    pub skipped_junk: u64,
+    pub warnings: Vec<String>,
+}
+
+/// 进度快照。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct ProgressInfo {
+    pub done_bytes: u64,
+    pub total_bytes: Option<u64>,
+    pub done_entries: u64,
+    pub total_entries: Option<u64>,
+    pub current: Option<String>,
+}
+
+/// 由 Swift 实现的进度回调。Rust 侧已节流（≥50 ms 或 ≥4 MB 才调一次）。
+#[uniffi::export(with_foreign)]
+pub trait ProgressListener: Send + Sync {
+    /// 收到一次进度。
+    fn on_progress(&self, info: ProgressInfo);
+}
+
+/// 把回调适配成核心的 Progress。
+struct ListenerAdapter(Arc<dyn ProgressListener>);
+
+impl Progress for ListenerAdapter {
+    fn report(&self, e: &ProgressEvent) {
+        self.0.on_progress(ProgressInfo {
+            done_bytes: e.done_bytes,
+            total_bytes: e.total_bytes,
+            done_entries: e.done_entries,
+            total_entries: e.total_entries,
+            current: e.current.clone(),
+        });
+    }
+}
+
+/// 取消句柄：UI 持有它，点取消时调用 `cancel()`。
+#[derive(uniffi::Object)]
+pub struct CancelHandle {
+    token: CancelToken,
+}
+
+#[uniffi::export]
+impl CancelHandle {
+    /// 新建。
+    #[uniffi::constructor]
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self { token: CancelToken::new() })
+    }
+
+    /// 请求取消。
+    pub fn cancel(&self) {
+        self.token.cancel();
+    }
+
+    /// 是否已取消。
+    pub fn is_cancelled(&self) -> bool {
+        self.token.is_cancelled()
+    }
+}
+
+/// 已打开的压缩包。
+#[derive(uniffi::Object)]
+pub struct ArchiveHandle {
+    inner: Mutex<Archive>,
+}
+
+/// 打开压缩包并自动识别编码。
+#[uniffi::export]
+pub fn open_archive(path: String, locale: Option<String>) -> Result<Arc<ArchiveHandle>, PiesiError> {
+    let archive = match locale {
+        Some(l) => Archive::open(Path::new(&path), Some(&l))?,
+        None => Archive::open_system(Path::new(&path))?,
+    };
+    Ok(Arc::new(ArchiveHandle { inner: Mutex::new(archive) }))
+}
+
+#[uniffi::export]
+impl ArchiveHandle {
+    /// 格式显示名。
+    pub fn format_name(&self) -> String {
+        self.inner.lock().unwrap().format().display_name().to_owned()
+    }
+
+    /// 条目总数。
+    pub fn entry_count(&self) -> u32 {
+        self.inner.lock().unwrap().entries().len() as u32
+    }
+
+    /// 当前编码识别结果。
+    pub fn encoding_info(&self) -> EncodingInfo {
+        let a = self.inner.lock().unwrap();
+        let d = a.detection();
+        EncodingInfo {
+            encoding: d.encoding.into(),
+            confidence: d.confidence,
+            source: format!("{:?}", d.source).to_lowercase(),
+            ambiguous: d.ambiguous,
+        }
+    }
+
+    /// 手动切换编码，只重解码不重读包。
+    pub fn set_encoding(&self, encoding: Encoding) {
+        self.inner.lock().unwrap().set_encoding(encoding.into());
+    }
+
+    /// 前 `limit` 个非 ASCII 名字的样本，编码选择器用来实时预览。
+    pub fn sample_names(&self, limit: u32) -> Vec<String> {
+        let a = self.inner.lock().unwrap();
+        a.names().iter().filter(|n| !n.is_ascii()).take(limit as usize).cloned().collect()
+    }
+
+    /// 密码状态。
+    pub fn password_state(&self) -> PasswordState {
+        match self.inner.lock().unwrap().needs_password() {
+            PasswordNeed::None => PasswordState::NotNeeded,
+            PasswordNeed::ForData => PasswordState::ForData,
+            PasswordNeed::ForNames => PasswordState::ForNames,
+        }
+    }
+
+    /// 设置密码。
+    pub fn set_password(&self, password: Option<String>) -> Result<(), PiesiError> {
+        self.inner.lock().unwrap().set_password(password.as_deref())?;
+        Ok(())
+    }
+
+    /// 列出某个目录层级（`dir` 为空 = 顶层）。目录行带子项计数；没有显式目录条目的中间目录也会合成出来。
+    pub fn list_dir(&self, dir: String) -> Vec<Row> {
+        let a = self.inner.lock().unwrap();
+        let prefix = if dir.is_empty() { String::new() } else { format!("{}/", dir.trim_matches('/')) };
+        let mut rows: Vec<Row> = Vec::new();
+        let mut index_of: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for (e, full) in a.entries().iter().zip(a.names()) {
+            let full = full.trim_end_matches('/');
+            let Some(rest) = full.strip_prefix(prefix.as_str()) else { continue };
+            if rest.is_empty() {
+                continue;
+            }
+            match rest.split_once('/') {
+                None => {
+                    // 直接子项
+                    let row = Row {
+                        id: e.id,
+                        name: rest.to_owned(),
+                        path: full.to_owned(),
+                        kind: match e.kind {
+                            EntryKind::File => Kind::File,
+                            EntryKind::Dir => Kind::Dir,
+                            EntryKind::Symlink => Kind::Symlink,
+                        },
+                        size: e.size,
+                        packed_size: e.packed_size,
+                        mtime: e.mtime,
+                        encrypted: e.encrypted,
+                        method: e.method.to_string(),
+                        child_count: 0,
+                    };
+                    match index_of.get(rest) {
+                        Some(&i) => {
+                            // 已由子项合成过目录行：补上真实 id 和元数据，保留计数
+                            let count = rows[i].child_count;
+                            rows[i] = Row { child_count: count, ..row };
+                        }
+                        None => {
+                            index_of.insert(rest.to_owned(), rows.len());
+                            rows.push(row);
+                        }
+                    }
+                }
+                Some((top, remainder)) => {
+                    // 更深的条目：确保顶层目录行存在，并把直接子项计数加一（只数一层）
+                    let i = match index_of.get(top) {
+                        Some(&i) => i,
+                        None => {
+                            index_of.insert(top.to_owned(), rows.len());
+                            rows.push(Row {
+                                id: u32::MAX,
+                                name: top.to_owned(),
+                                path: format!("{prefix}{top}"),
+                                kind: Kind::Dir,
+                                size: 0,
+                                packed_size: None,
+                                mtime: None,
+                                encrypted: false,
+                                method: String::new(),
+                                child_count: 0,
+                            });
+                            rows.len() - 1
+                        }
+                    };
+                    if !remainder.contains('/') {
+                        rows[i].child_count += 1;
+                    }
+                }
+            }
+        }
+        rows
+    }
+
+    /// 平铺搜索：名字包含关键字（不区分大小写），最多 `limit` 条。
+    pub fn search(&self, query: String, limit: u32) -> Vec<Row> {
+        let a = self.inner.lock().unwrap();
+        let q = query.to_lowercase();
+        a.entries()
+            .iter()
+            .zip(a.names())
+            .filter(|(_, n)| n.to_lowercase().contains(&q))
+            .take(limit as usize)
+            .map(|(e, n)| Row {
+                id: e.id,
+                name: n.rsplit('/').next().unwrap_or(n).to_owned(),
+                path: n.clone(),
+                kind: match e.kind {
+                    EntryKind::File => Kind::File,
+                    EntryKind::Dir => Kind::Dir,
+                    EntryKind::Symlink => Kind::Symlink,
+                },
+                size: e.size,
+                packed_size: e.packed_size,
+                mtime: e.mtime,
+                encrypted: e.encrypted,
+                method: e.method.to_string(),
+                child_count: 0,
+            })
+            .collect()
+    }
+
+    /// 解压。阻塞调用，Swift 侧放到后台线程；进度经 listener 回调，取消经 cancel。
+    pub fn extract(&self, request: ExtractRequest, listener: Arc<dyn ProgressListener>, cancel: Arc<CancelHandle>) -> Result<ExtractResult, PiesiError> {
+        let mut a = self.inner.lock().unwrap();
+        let mut opts = ExtractOptions::beside_archive(a.path());
+        opts.dest = PathBuf::from(request.dest);
+        opts.smart_folder = request.smart_folder;
+        opts.skip_junk = request.skip_junk;
+        opts.conflict = match request.conflict {
+            Conflict::Overwrite => ConflictPolicy::Overwrite,
+            Conflict::Skip => ConflictPolicy::Skip,
+            Conflict::Rename => ConflictPolicy::Rename,
+        };
+        let progress = ListenerAdapter(listener);
+        let ctx = OpContext::new(&progress, &cancel.token);
+        let selected = if request.ids.is_empty() { None } else { Some(request.ids.as_slice()) };
+        let outcome = a.extract(selected, &opts, &ctx)?;
+        Ok(ExtractResult {
+            root: outcome.root.to_string_lossy().into_owned(),
+            extracted: outcome.report.extracted,
+            skipped: outcome.report.skipped,
+            skipped_junk: outcome.skipped_junk,
+            warnings: outcome.report.warnings,
+        })
+    }
+
+    /// 把单个条目解到临时文件（Quick Look 预览用），返回临时文件路径。
+    pub fn extract_entry_to_temp(&self, id: u32, cancel: Arc<CancelHandle>) -> Result<String, PiesiError> {
+        let mut a = self.inner.lock().unwrap();
+        let name = a.names().get(id as usize).cloned().ok_or(PiesiError::Other { message: format!("条目不存在：{id}") })?;
+        let file_name = name.rsplit('/').next().unwrap_or("entry").to_owned();
+        let dir = std::env::temp_dir().join(format!("piesi-preview-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).map_err(|e| PiesiError::Other { message: e.to_string() })?;
+        let path = dir.join(format!("{id}-{file_name}"));
+        let mut out = std::fs::File::create(&path).map_err(|e| PiesiError::Other { message: e.to_string() })?;
+        let progress = piesi_core::progress::NoProgress;
+        let ctx = OpContext::new(&progress, &cancel.token);
+        a.read_entry(id, &mut out, &ctx)?;
+        Ok(path.to_string_lossy().into_owned())
+    }
 }

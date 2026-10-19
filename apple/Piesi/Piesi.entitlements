@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- apple/Piesi/Piesi.entitlements —— 主应用非沙盒（直接分发，设计 5.1）。hardened runtime 在 build setting 里开，目前不需要任何例外项。 -->
+<plist version="1.0">
+<dict/>
+</plist>

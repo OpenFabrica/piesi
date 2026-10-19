@@ -1,0 +1,833 @@
+[
+  {
+    "file": "encoding/utf8_raw_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "valid_utf8",
+    "expected_names": [
+      "你好世界.txt",
+      "résumé.pdf",
+      "Übersicht/",
+      "Übersicht/Käse Straße.txt",
+      "日本語/",
+      "日本語/한국어.txt",
+      "emoji 😀/",
+      "emoji 😀/файл.txt"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "UTF-8 字节、无 bit 11（Finder/ditto、旧 7-Zip 风格），全部合法 UTF-8 直接判定"
+  },
+  {
+    "file": "encoding/utf8_bit11_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "你好世界.txt",
+      "résumé.pdf",
+      "Übersicht/",
+      "Übersicht/Käse Straße.txt",
+      "日本語/",
+      "日本語/한국어.txt",
+      "emoji 😀/",
+      "emoji 😀/файл.txt"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（utf8 名字集）"
+  },
+  {
+    "file": "encoding/utf8_7075_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "你好世界.txt",
+      "résumé.pdf",
+      "Übersicht/",
+      "Übersicht/Käse Straße.txt",
+      "日本語/",
+      "日本語/한국어.txt",
+      "emoji 😀/",
+      "emoji 😀/файл.txt"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "utf8 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/utf8_raw_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "valid_utf8",
+    "expected_names": [
+      "你好世界.txt",
+      "résumé.pdf",
+      "Übersicht/",
+      "Übersicht/Käse Straße.txt",
+      "日本語/",
+      "日本語/한국어.txt",
+      "emoji 😀/",
+      "emoji 😀/файл.txt"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "UTF-8 字节、无 bit 11（Finder/ditto、旧 7-Zip 风格），全部合法 UTF-8 直接判定"
+  },
+  {
+    "file": "encoding/utf8_bit11_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "你好世界.txt",
+      "résumé.pdf",
+      "Übersicht/",
+      "Übersicht/Käse Straße.txt",
+      "日本語/",
+      "日本語/한국어.txt",
+      "emoji 😀/",
+      "emoji 😀/файл.txt"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（utf8 名字集）"
+  },
+  {
+    "file": "encoding/utf8_7075_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "你好世界.txt",
+      "résumé.pdf",
+      "Übersicht/",
+      "Übersicht/Käse Straße.txt",
+      "日本語/",
+      "日本語/한국어.txt",
+      "emoji 😀/",
+      "emoji 😀/файл.txt"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "utf8 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/gb18030_raw_dos.zip",
+    "expected_encoding": "gb18030",
+    "expected_source": "scored",
+    "expected_names": [
+      "你好世界.txt",
+      "文档/",
+      "文档/报告.docx",
+      "图片/",
+      "图片/照片（1）.jpg",
+      "张喆的简历.pdf"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "gb18030 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/gb18030_bit11_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "你好世界.txt",
+      "文档/",
+      "文档/报告.docx",
+      "图片/",
+      "图片/照片（1）.jpg",
+      "张喆的简历.pdf"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（gb18030 名字集）"
+  },
+  {
+    "file": "encoding/gb18030_7075_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "你好世界.txt",
+      "文档/",
+      "文档/报告.docx",
+      "图片/",
+      "图片/照片（1）.jpg",
+      "张喆的简历.pdf"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "gb18030 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/gb18030_raw_unix.zip",
+    "expected_encoding": "gb18030",
+    "expected_source": "scored",
+    "expected_names": [
+      "你好世界.txt",
+      "文档/",
+      "文档/报告.docx",
+      "图片/",
+      "图片/照片（1）.jpg",
+      "张喆的简历.pdf"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "gb18030 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/gb18030_bit11_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "你好世界.txt",
+      "文档/",
+      "文档/报告.docx",
+      "图片/",
+      "图片/照片（1）.jpg",
+      "张喆的简历.pdf"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（gb18030 名字集）"
+  },
+  {
+    "file": "encoding/gb18030_7075_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "你好世界.txt",
+      "文档/",
+      "文档/报告.docx",
+      "图片/",
+      "图片/照片（1）.jpg",
+      "张喆的简历.pdf"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "gb18030 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/big5_raw_dos.zip",
+    "expected_encoding": "big5",
+    "expected_source": "scored",
+    "expected_names": [
+      "測試檔案.txt",
+      "文件/",
+      "文件/報告.docx",
+      "圖片/",
+      "圖片/相片.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "big5 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/big5_bit11_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "測試檔案.txt",
+      "文件/",
+      "文件/報告.docx",
+      "圖片/",
+      "圖片/相片.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（big5 名字集）"
+  },
+  {
+    "file": "encoding/big5_7075_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "測試檔案.txt",
+      "文件/",
+      "文件/報告.docx",
+      "圖片/",
+      "圖片/相片.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "big5 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/big5_raw_unix.zip",
+    "expected_encoding": "big5",
+    "expected_source": "scored",
+    "expected_names": [
+      "測試檔案.txt",
+      "文件/",
+      "文件/報告.docx",
+      "圖片/",
+      "圖片/相片.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "big5 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/big5_bit11_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "測試檔案.txt",
+      "文件/",
+      "文件/報告.docx",
+      "圖片/",
+      "圖片/相片.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（big5 名字集）"
+  },
+  {
+    "file": "encoding/big5_7075_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "測試檔案.txt",
+      "文件/",
+      "文件/報告.docx",
+      "圖片/",
+      "圖片/相片.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "big5 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/shift_jis_raw_dos.zip",
+    "expected_encoding": "shift_jis",
+    "expected_source": "scored",
+    "expected_names": [
+      "日本語ファイル.txt",
+      "資料/",
+      "資料/報告書.docx",
+      "写真/",
+      "写真/東京タワー.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "shift_jis 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/shift_jis_bit11_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "日本語ファイル.txt",
+      "資料/",
+      "資料/報告書.docx",
+      "写真/",
+      "写真/東京タワー.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（shift_jis 名字集）"
+  },
+  {
+    "file": "encoding/shift_jis_7075_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "日本語ファイル.txt",
+      "資料/",
+      "資料/報告書.docx",
+      "写真/",
+      "写真/東京タワー.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "shift_jis 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/shift_jis_raw_unix.zip",
+    "expected_encoding": "shift_jis",
+    "expected_source": "scored",
+    "expected_names": [
+      "日本語ファイル.txt",
+      "資料/",
+      "資料/報告書.docx",
+      "写真/",
+      "写真/東京タワー.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "shift_jis 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/shift_jis_bit11_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "日本語ファイル.txt",
+      "資料/",
+      "資料/報告書.docx",
+      "写真/",
+      "写真/東京タワー.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（shift_jis 名字集）"
+  },
+  {
+    "file": "encoding/shift_jis_7075_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "日本語ファイル.txt",
+      "資料/",
+      "資料/報告書.docx",
+      "写真/",
+      "写真/東京タワー.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "shift_jis 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/euc_kr_raw_dos.zip",
+    "expected_encoding": "euc_kr",
+    "expected_source": "scored",
+    "expected_names": [
+      "한국어파일.txt",
+      "문서/",
+      "문서/보고서.docx",
+      "사진/",
+      "사진/서울.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "euc_kr 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/euc_kr_bit11_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "한국어파일.txt",
+      "문서/",
+      "문서/보고서.docx",
+      "사진/",
+      "사진/서울.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（euc_kr 名字集）"
+  },
+  {
+    "file": "encoding/euc_kr_7075_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "한국어파일.txt",
+      "문서/",
+      "문서/보고서.docx",
+      "사진/",
+      "사진/서울.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "euc_kr 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/euc_kr_raw_unix.zip",
+    "expected_encoding": "euc_kr",
+    "expected_source": "scored",
+    "expected_names": [
+      "한국어파일.txt",
+      "문서/",
+      "문서/보고서.docx",
+      "사진/",
+      "사진/서울.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "euc_kr 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/euc_kr_bit11_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "한국어파일.txt",
+      "문서/",
+      "문서/보고서.docx",
+      "사진/",
+      "사진/서울.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（euc_kr 名字集）"
+  },
+  {
+    "file": "encoding/euc_kr_7075_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "한국어파일.txt",
+      "문서/",
+      "문서/보고서.docx",
+      "사진/",
+      "사진/서울.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "euc_kr 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/cp1251_raw_dos.zip",
+    "expected_encoding": "cp1251",
+    "expected_source": "scored",
+    "expected_names": [
+      "Привет.txt",
+      "Документы/",
+      "Документы/Отчёт.docx",
+      "Фото/",
+      "Фото/Москва.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "cp1251 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/cp1251_bit11_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "Привет.txt",
+      "Документы/",
+      "Документы/Отчёт.docx",
+      "Фото/",
+      "Фото/Москва.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（cp1251 名字集）"
+  },
+  {
+    "file": "encoding/cp1251_7075_dos.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "Привет.txt",
+      "Документы/",
+      "Документы/Отчёт.docx",
+      "Фото/",
+      "Фото/Москва.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "cp1251 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/cp1251_raw_unix.zip",
+    "expected_encoding": "cp1251",
+    "expected_source": "scored",
+    "expected_names": [
+      "Привет.txt",
+      "Документы/",
+      "Документы/Отчёт.docx",
+      "Фото/",
+      "Фото/Москва.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "cp1251 原始字节、无标志、无扩展字段，必须靠候选打分识别"
+  },
+  {
+    "file": "encoding/cp1251_bit11_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "Привет.txt",
+      "Документы/",
+      "Документы/Отчёт.docx",
+      "Фото/",
+      "Фото/Москва.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "同一组名字由现代工具写出：UTF-8 + bit 11（cp1251 名字集）"
+  },
+  {
+    "file": "encoding/cp1251_7075_unix.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "Привет.txt",
+      "Документы/",
+      "Документы/Отчёт.docx",
+      "Фото/",
+      "Фото/Москва.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "cp1251 原始字节 + 0x7075 UTF-8 名；名字取自扩展字段，不需要识别"
+  },
+  {
+    "file": "encoding/finder_style.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "valid_utf8",
+    "expected_names": [
+      "项目/",
+      "项目/报告.docx",
+      "项目/.DS_Store",
+      "__MACOSX/",
+      "__MACOSX/项目/",
+      "__MACOSX/项目/._报告.docx",
+      "Thumbs.db"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": false,
+      "locale": null
+    },
+    "note": "Finder「压缩」风格：UTF-8 字节、不设 bit 11、made by Unix，夹带 __MACOSX/._ 与 .DS_Store 垃圾",
+    "expected_junk": [
+      "项目/.DS_Store",
+      "__MACOSX/",
+      "__MACOSX/项目/",
+      "__MACOSX/项目/._报告.docx",
+      "Thumbs.db"
+    ]
+  },
+  {
+    "file": "encoding/winrar_style.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "format",
+    "expected_names": [
+      "readme.txt",
+      "合同/",
+      "合同/采购合同（最终版）.pdf",
+      "合同/附件①.xlsx",
+      "照片/",
+      "照片/IMG_0001.jpg",
+      "照片/喆.jpg"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "WinRAR 6.x 中文 Windows 风格：GBK 字节 + 0x7075、made by DOS；纯 ASCII 名没有 0x7075（它们本身合法 UTF-8）"
+  },
+  {
+    "file": "encoding/liar_bit11_gbk.zip",
+    "expected_encoding": "gb18030",
+    "expected_source": "scored",
+    "expected_names": [
+      "你好世界.txt",
+      "文档/",
+      "文档/报告.docx",
+      "图片/",
+      "图片/照片（1）.jpg",
+      "张喆的简历.pdf"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "bit 11 撒谎：标志设了但字节是 GBK（非法 UTF-8）。标志与字节矛盾时信字节，回退到打分"
+  },
+  {
+    "file": "encoding/mixed_gbk_and_utf8.zip",
+    "expected_encoding": "gb18030",
+    "expected_source": "scored",
+    "expected_names": [
+      "新建文件夹/",
+      "新建文件夹/旧文件.txt",
+      "新建文件夹/新增.txt"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "同一包里旧条目是 GBK 无标志、新条目是 UTF-8 + bit 11（被不同工具更新过）：打分只看无标志条目，带标志的按 UTF-8"
+  },
+  {
+    "file": "encoding/short_gbk_two_chars.zip",
+    "expected_encoding": "gb18030",
+    "expected_source": "scored",
+    "expected_names": [
+      "你好.txt"
+    ],
+    "ambiguous": true,
+    "hints": {
+      "made_by_dos": true,
+      "locale": "zh-CN"
+    },
+    "note": "只有一个 2 字名：GBK/Big5/EUC-KR 都能解出常用字，证据不足，靠 zh-CN locale 先验选 GBK 并标 ambiguous 让用户确认"
+  },
+  {
+    "file": "encoding/accidental_utf8_gbk.zip",
+    "expected_encoding": "gb18030",
+    "expected_source": "scored",
+    "expected_names": [
+      "图片.docx",
+      "通知.txt"
+    ],
+    "ambiguous": true,
+    "hints": {
+      "made_by_dos": true,
+      "locale": "zh-CN"
+    },
+    "note": "GBK 的「图片」「通知」字节恰好是合法 UTF-8（会显示成 ͼƬ、֪ͨ）：脚本不一致守卫把它交给打分，并标 ambiguous"
+  },
+  {
+    "file": "encoding/cp866_dos.zip",
+    "expected_encoding": "cp866",
+    "expected_source": "scored",
+    "expected_names": [
+      "Привет.txt",
+      "Документы/",
+      "Документы/Отчёт.docx"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "DOS 时代俄文 PKZIP 风格：CP866 字节、made by DOS"
+  },
+  {
+    "file": "encoding/cp1252_western.zip",
+    "expected_encoding": "cp1252",
+    "expected_source": "scored",
+    "expected_names": [
+      "résumé.pdf",
+      "Übersicht/",
+      "Übersicht/Käse Straße.txt"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "西欧 Windows 工具产物：CP1252 字节、made by DOS"
+  },
+  {
+    "file": "encoding/ascii_only.zip",
+    "expected_encoding": "utf8",
+    "expected_source": "valid_utf8",
+    "expected_names": [
+      "readme.txt",
+      "src/",
+      "src/main.rs"
+    ],
+    "ambiguous": false,
+    "hints": {
+      "made_by_dos": true,
+      "locale": null
+    },
+    "note": "全部 ASCII：任何编码都一样，置信度 1"
+  }
+]

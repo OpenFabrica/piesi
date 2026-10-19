@@ -3,8 +3,10 @@
 
 pub mod archive;
 pub mod codec;
+pub mod create;
 pub mod encoding;
 pub mod error;
+pub mod facade;
 pub mod fmt;
 pub mod fs;
 pub mod names;

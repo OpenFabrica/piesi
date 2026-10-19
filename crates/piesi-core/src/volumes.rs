@@ -50,6 +50,11 @@ impl ChainedReader {
         self.total == 0
     }
 
+    /// 各分段在逻辑流里的起始偏移（前缀和），多盘 zip 换算 (盘号, 盘内偏移) 时用。
+    pub fn part_offsets(&self) -> &[u64] {
+        &self.offsets
+    }
+
     /// 根据逻辑偏移定位到对应分段并 seek 文件。
     fn locate(&mut self, pos: u64) -> io::Result<()> {
         let pos = pos.min(self.total);

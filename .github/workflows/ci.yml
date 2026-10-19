@@ -1,0 +1,39 @@
+# 持续集成：Rust 测试 + 语料回归 + macOS app 构建。
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: 安装生成语料要用的工具
+        run: brew install sevenzip
+      - name: 测试
+        run: cargo test --workspace --locked
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  app:
+    runs-on: macos-15
+    needs: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: 安装 xcodegen
+        run: brew install xcodegen
+      - name: 构建核心 XCFramework
+        run: scripts/build-core.sh
+      - name: 生成并构建 Xcode 工程（不签名）
+        run: |
+          cd apple && xcodegen generate
+          xcodebuild -project Piesi.xcodeproj -scheme Piesi -configuration Debug \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build

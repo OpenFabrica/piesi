@@ -1,0 +1,91 @@
+# apple/project.yml —— xcodegen 工程定义（Piesi.xcodeproj 不入库，用 `xcodegen generate` 生成）。
+# 生成前先跑 scripts/build-core.sh：它产出 PiesiCore.xcframework 和 Generated/piesi_ffi.swift，两者都不入库。
+name: Piesi
+options:
+  bundleIdPrefix: com.citrolabs
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "27.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+# 版本号只存 Config/Version.xcconfig 一处（docs/release.md 第 4 条）
+configFiles:
+  Debug: Config/Version.xcconfig
+  Release: Config/Version.xcconfig
+
+settings:
+  base:
+    # 个人团队 + 自动签名（~/.claude/docs/apple-signing.md）；Debug 用 Apple Development 证书，发版由 scripts/package.sh 换 Developer ID
+    DEVELOPMENT_TEAM: HQ537XMLJY
+    CODE_SIGN_STYLE: Automatic
+    # 公证要求所有可执行文件开 hardened runtime，app 和 appex 都开
+    ENABLE_HARDENED_RUNTIME: YES
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    # Info.plist 手写（放在各 target 目录），不让 Xcode 自动生成
+    GENERATE_INFOPLIST_FILE: NO
+    # Rust 静态库里有 unrar 的 C++ 代码（cc crate 编的），最终链接要带 libc++
+    OTHER_LDFLAGS: -lc++
+
+targets:
+  # 主应用：SwiftUI + AppKit，非沙盒（直接分发，设计 5.1）
+  Piesi:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    configFiles:
+      Debug: Config/Version.xcconfig
+      Release: Config/Version.xcconfig
+    sources:
+      - path: Piesi
+      # uniffi 生成的 Swift 绑定，scripts/build-core.sh 产出
+      - path: Generated/piesi_ffi.swift
+    dependencies:
+      # 静态库 xcframework：只链接不嵌入（里面没有动态库）
+      - framework: PiesiCore.xcframework
+        embed: false
+      # Quick Look 扩展随 app 一起打包到 PlugIns/
+      - target: PiesiQuickLook
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.citrolabs.piesi
+        PRODUCT_NAME: Piesi
+        INFOPLIST_FILE: Piesi/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Piesi/Piesi.entitlements
+
+  # Quick Look 预览扩展：沙盒、只读索引不解压（设计 6.4）
+  PiesiQuickLook:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "14.0"
+    configFiles:
+      Debug: Config/Version.xcconfig
+      Release: Config/Version.xcconfig
+    sources:
+      - path: PiesiQuickLook
+      - path: Generated/piesi_ffi.swift
+    dependencies:
+      - framework: PiesiCore.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.citrolabs.piesi.quicklook
+        PRODUCT_NAME: PiesiQuickLook
+        INFOPLIST_FILE: PiesiQuickLook/Info.plist
+        CODE_SIGN_ENTITLEMENTS: PiesiQuickLook/PiesiQuickLook.entitlements
+
+# 共享 scheme，xcodebuild -scheme Piesi 直接可用（不靠 Xcode GUI 自动生成）
+schemes:
+  Piesi:
+    build:
+      targets:
+        Piesi: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

@@ -34,7 +34,7 @@
 ### 2.3 技术底座可用性（已核实）
 
 - Rust `zip` 9.0.5（MIT）：AES 读写、zip64、流式、追加写入，提供 `name_raw()`、`flags()`、`extra_data_fields()`。**不支持 PKWARE 多盘分卷（`.z01`）**；两年内大版本 2→9，append/zip64 出过回归 → 只用它**写**，锁死版本。
-- Rust `sevenz-rust2` 0.24.1（Apache-2.0）：7z 读写、AES-256、**全部 BCJ 过滤器（x86/ARM/ARM64/RISC-V/PPC/SPARC/IA64）读写 + BCJ2 读**、Delta、PPMd；没有多线程。
+- Rust `sevenz-rust2` 0.24.1（Apache-2.0）：7z 读写、AES-256、**全部 BCJ 过滤器（x86/ARM/ARM64/RISC-V/PPC/SPARC/IA64）读写 + BCJ2 读**、Delta、PPMd。实现时核实：`Lzma2Options::from_level_mt(level, threads, chunk_size)` 已支持多线程分块压缩，评审说的「没有多线程」只看了首页。
 - Rust `zesven` 3.2.0（2026-10，MIT/Apache）：多线程、AES、多卷，但**文档里完全没有 BCJ/BCJ2**。7-Zip 给 exe/dll 默认加 BCJ、高压缩级别用 BCJ2，国内软件包 .7z 大量命中 → 不能当主引擎，只做基准参照。
 - `liblzma` crate（0BSD，可静态链接）：`lzma_raw_encoder/decoder` + LZMA2 过滤器输出的就是 7z packed stream 位流；tar.xz 本来就要它。LZMA SDK 只有编解码器没有 7z 容器写入器，不选。
 - Rust `unrar` 0.5.8：封装 RARLAB unrar C++ 库，只能列出/解压，**顺序处理模型**（选择性解压 = 遍历 + 跳过）；许可允许商用，禁止用来做 RAR 压缩（全世界只有 WinRAR 能创建 RAR）。
@@ -76,6 +76,8 @@
 - 编辑压缩包：Overlay 暂存模型（增、删、改名先落内存，Save 时写临时文件 → fsync → 原子替换）；zip 追加走 `new_append`，删除/改名重写时用 `raw_copy_file` 免重压；7z 编辑 = 整包重写；RAR 编辑 = 「转存为 zip/7z」。顺带得到撤销。
 - 压缩预设与自动化（预设卡片、Shortcuts 动作、压缩完自动跑 Shortcut）。
 - 测试压缩包、修复 zip（扫描本地文件头重建中央目录）。
+- 「修复文件名编码并保存」：GBK 旧包 → UTF-8 + bit 11 + NFC，条目数据原样拷贝零重压（评审提出，顺着 Overlay 重写路径免费得到）。
+- 双击直接解压后若编码置信度低，完成通知里给「用其他编码重新解压…」入口，并记录本次用的编码。
 - 任务队列窗口、批量操作。
 - 长尾格式（iso/cab/xar/cpio/lha）经系统 `/usr/bin/bsdtar` 只读兜底。
 - Mac App Store 版（沙盒，只需在 App 层加 security-scoped bookmark）。
@@ -117,7 +119,7 @@
 ### 5.1 选型与理由（一句话）
 - **核心用 Rust**：解析不可信压缩包是经典攻击面（libarchive、7-Zip 年年出 CVE），内存安全值回票价；一套引擎服务 Mac、Windows、CLI。
 - **UI 用 SwiftUI + AppKit**：Mac 原生感是卖点，Finder/Quick Look/Services 都必须原生写；不用 Tauri/Flutter。
-- **7z = sevenz-rust2 容器 + liblzma 编解码，day one 就这样**：sevenz-rust2 有全部 BCJ/BCJ2，兼容性优先；速度在 Codec 层解决——照 7-Zip 做法按 4×dict 切块，Rayon 并行各跑一个 raw LZMA2 encoder，去掉除末块外的结束字节后拼接。lzma-rust2 留在 feature 后当纯 Rust 备胎。不选 7-Zip 的 `7z.so`（COM 风格无文档 API、约 1.5k 行 C++ shim、它的 zip handler 先解码文件名再给你，和编码层打架）。
+- **7z = sevenz-rust2 容器 + 它自带的多线程 LZMA2（`from_level_mt`，4×dict 分块）**：sevenz-rust2 有全部 BCJ/BCJ2，兼容性优先。P0 基准若比 `7zz` 慢超过 2 倍，再在 Codec 层接 liblzma 的 raw LZMA2 encoder 做分块并行。不选 7-Zip 的 `7z.so`（COM 风格无文档 API、约 1.5k 行 C++ shim、它的 zip handler 先解码文件名再给你，和编码层打架）。
 - **ZIP 读取器自写**：中央目录 + local header 约 800 行，编解码和 AES（aes + hmac + pbkdf2）用 crates。原始文件名、编码重解、损坏 CD 的扫描修复、`.z01` 分卷全靠它；写入继续用 `zip` crate。
 - **不 bundle `7zz`/`unrar` 子进程**（Keka 路线）：进度、取消、选择性解压、编码覆盖都难做，也无法移植。
 - **直接分发（Developer ID + 公证）优先**，不先上 MAS：沙盒会卡「解压到压缩包旁边」这类基本操作；core 保持路径无关，日后 MAS 只改 App 层。
@@ -176,9 +178,11 @@
 - 首次启动只问一件事：「设为默认解压工具」。
 
 ### 6.4 系统集成
-- 默认处理器：注册 zip/7z/rar/tar/gz/bz2/xz/zst 等 UTI。
+- 默认处理器：注册 zip/7z/rar/tar/gz/bz2/xz/zst 等 UTI；7z（`org.7-zip.7-zip-archive`）、rar（`com.rarlab.rar-archive`）、zst 系统没声明，放进 `UTImportedTypeDeclarations`；「设为默认」用 `NSWorkspace.setDefaultApplication(at:toOpen:)` 逐个 UTI 设置。
+- TCC：非沙盒 app 写 Desktop/Documents/Downloads 要在 Info.plist 写三个 `NS*FolderUsageDescription`，否则授权弹窗没有文字甚至静默拒绝。
+- CLI `piesi` 随 app 打包在 `Contents/MacOS/`，同 hardened runtime 签名、一起公证。
 - Finder 右键：`NSServices`（「用 Piesi 压缩」「用 Piesi 解压到此处」「用 Piesi 查看」）+ App Intents（可做 Quick Action）。
-- Quick Look 扩展：空格预览包内文件列表；appex 永远沙盒且内存受限，**只做索引不解压**；头加密的 7z 无法预览（不能要密码）。
+- Quick Look 扩展：空格预览包内文件列表；appex 永远沙盒且内存受限，**只做索引不解压**，列表最多 1 万行；头加密的 7z 无法预览（不能要密码）。
 - 不用 FinderSync（为同步盘设计，不合适）。
 
 ### 6.5 分发

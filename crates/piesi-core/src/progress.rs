@@ -106,11 +106,11 @@ impl<'a> Throttle<'a> {
         self.maybe_report(false)
     }
 
-    /// 开始处理新条目：更新计数与当前名字，强制上报一次。
+    /// 开始处理新条目：更新计数与当前名字。也走节流：十万个小文件不能变成十万次跨 FFI 回调。
     pub fn begin_entry(&mut self, name: &str) -> crate::Result<()> {
         self.event.done_entries += 1;
         self.event.current = Some(name.to_owned());
-        self.maybe_report(true)
+        self.maybe_report(false)
     }
 
     /// 操作结束时强制上报最终状态。

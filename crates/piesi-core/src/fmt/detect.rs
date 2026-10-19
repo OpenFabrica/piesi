@@ -15,7 +15,8 @@ pub fn detect_format(path: &Path) -> Result<Option<Format>> {
     let head = &head[..n];
 
     if let Some(fmt) = detect_by_magic(head) {
-        return Ok(Some(fmt));
+        // gz/bz2/xz/zst 外壳要结合扩展名判断是不是 tar.*（.tgz 的魔数只是 gz）
+        return Ok(Some(refine_stream_format(fmt, path)));
     }
     // ustar 标记：偏移 257 处 "ustar"；老式 tar 没有标记，只能靠扩展名
     if n >= 262 && &head[257..262] == b"ustar" {

@@ -229,4 +229,9 @@ pub trait ArchiveReader: Send {
     fn comment(&self) -> Option<&[u8]> {
         None
     }
+
+    /// 给编码识别的先验：zip 驱动在中央目录 version made by 多为 MS-DOS 时置 made_by_dos。
+    fn hints(&self) -> crate::encoding::Hints {
+        crate::encoding::Hints::default()
+    }
 }

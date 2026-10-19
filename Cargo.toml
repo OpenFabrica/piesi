@@ -15,11 +15,12 @@ repository = "https://github.com/rambocode/piesi"
 zip = { version = "=9.0.5", default-features = false, features = ["deflate", "aes-crypto", "time"] }
 sevenz-rust2 = { version = "=0.24.1", default-features = false, features = ["aes256", "compress", "util"] }
 unrar = "=0.5.8"
+unrar_sys = "=0.5.8"
 tar = "=0.4.46"
 flate2 = "=1.1.10"
 bzip2 = "=0.6.1"
-liblzma = { version = "=0.4.9", features = ["static"] }
-zstd = "=0.14.3"
+liblzma = { version = "=0.4.9", features = ["static", "parallel"] }
+zstd = { version = "=0.14.3", features = ["zstdmt"] }
 deflate64 = "=0.1.12"
 ppmd-rust = "=1.5.1"
 crc32fast = "=1.5.2"

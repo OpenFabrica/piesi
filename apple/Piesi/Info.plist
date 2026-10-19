@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- apple/Piesi/Info.plist —— 主应用的 bundle 描述。$(...) 由 Xcode 构建时替换，版本号来自 Config/Version.xcconfig。 -->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Piesi</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- 开发标记（-dev）单独放：CFBundleShortVersionString 只认数字点号（docs/release.md） -->
+	<key>PiesiVersionSuffix</key>
+	<string>$(VERSION_SUFFIX)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<!-- 必须：解压出来的文件要继承源包的 quarantine，交给 Gatekeeper 把关（设计 5.3） -->
+	<key>LSFileQuarantineEnabled</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Piesi contributors · MIT OR Apache-2.0</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<!-- TCC：非沙盒 app 写桌面/文稿/下载会触发系统授权，没有这三个说明键弹窗没文字、甚至静默拒绝 -->
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Piesi 需要访问「桌面」文件夹以解压或创建压缩包。</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Piesi 需要访问「文稿」文件夹以解压或创建压缩包。</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Piesi 需要访问「下载」文件夹以解压或创建压缩包。</string>
+	<!-- 可打开的压缩包类型；LSHandlerRank = Alternate，不抢系统默认，首次启动再问用户是否设为默认（设计 6.3） -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Archive</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.zip-archive</string>
+				<string>org.7-zip.7-zip-archive</string>
+				<string>com.rarlab.rar-archive</string>
+				<string>public.tar-archive</string>
+				<string>org.gnu.gnu-zip-archive</string>
+				<string>org.gnu.gnu-zip-tar-archive</string>
+				<string>public.bzip2-archive</string>
+				<string>public.tar-bzip2-archive</string>
+				<string>org.tukaani.xz-archive</string>
+				<string>org.tukaani.tar-xz-archive</string>
+				<string>org.zstd.zstd-archive</string>
+				<!-- Keka 等工具导出的 zst 类型；装了它们的机器上 .zst 会解析成这个，不列就关联不上 -->
+				<string>com.facebook.zstandard-archive</string>
+			</array>
+		</dict>
+	</array>
+	<!-- 7z/rar/zst 三个类型都导入兜底（导入声明只在没有别的导出声明时生效）：
+	     7z 系统 CoreTypes 声明为 org.7-zip.7-zip-archive（Keka/BetterZip 也用这个），rar 和 zst 系统没声明。 -->
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.7-zip.7-zip-archive</string>
+			<key>UTTypeDescription</key>
+			<string>7-Zip archive</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.archive</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>7z</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/x-7z-compressed</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.rarlab.rar-archive</string>
+			<key>UTTypeDescription</key>
+			<string>RAR archive</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.archive</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>rar</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/vnd.rar</string>
+					<string>application/x-rar-compressed</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.zstd.zstd-archive</string>
+			<key>UTTypeDescription</key>
+			<string>Zstandard archive</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.archive</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>zst</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/zstd</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>

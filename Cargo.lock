@@ -931,6 +931,7 @@ dependencies = [
  "unicode-normalization",
  "unicode-segmentation",
  "unrar",
+ "unrar_sys",
  "xattr",
  "zip",
  "zstd",
