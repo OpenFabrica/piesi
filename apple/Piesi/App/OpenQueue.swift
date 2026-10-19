@@ -1,10 +1,10 @@
 // OpenQueue.swift —— 打开请求的串行队列：多文件按顺序一个个走完整流程，避免同时弹好几个密码框。
 import Foundation
 
-/// 一次「打开文件」请求。
+/// 一次「打开文件」请求：Finder / 拖放一次给的一批文件。
 struct OpenRequest: Sendable {
-    let url: URL
-    /// true = 浏览窗口，false = 直接解压
+    let urls: [URL]
+    /// 压缩包：true = 浏览窗口，false = 直接解压；普通文件不受影响，一律进压缩对话框
     let browse: Bool
 }
 

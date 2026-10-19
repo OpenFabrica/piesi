@@ -9,6 +9,17 @@ final class ServicesProvider: NSObject {
         handle(pasteboard, error: error, browse: false)
     }
 
+    /// 「用 Piesi 压缩」：任意文件 / 文件夹进压缩对话框。
+    @objc func compressWithPiesi(_ pasteboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        let urls = fileURLs(from: pasteboard)
+        guard !urls.isEmpty else {
+            error.pointee = "没有收到文件"
+            return
+        }
+        Log.open.notice("service compress: \(urls.count) files")
+        AppDelegate.shared.compress(sources: urls)
+    }
+
     /// 「用 Piesi 查看」：浏览窗口。
     @objc func browseWithPiesi(_ pasteboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         handle(pasteboard, error: error, browse: true)

@@ -40,6 +40,7 @@ enum MainMenu {
 
     private static func fileMenu() -> NSMenuItem {
         let menu = NSMenu(title: "文件")
+        menu.addItem(withTitle: "新建压缩包…", action: #selector(AppDelegate.newArchive(_:)), keyEquivalent: "n")
         menu.addItem(withTitle: "打开压缩包…", action: #selector(AppDelegate.openDocument(_:)), keyEquivalent: "o")
         menu.addItem(.separator())
         menu.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")

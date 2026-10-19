@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let taskCenter = TaskCenter()
     private(set) lazy var tasksWindow = TasksWindowController(center: taskCenter)
     private(set) lazy var extractor = ExtractCoordinator(taskCenter: taskCenter, settings: settings, tasksWindow: tasksWindow)
+    private(set) lazy var compressor = CompressCoordinator(taskCenter: taskCenter, settings: settings, tasksWindow: tasksWindow)
     private lazy var openQueue = OpenQueue { [weak self] request in
         await self?.handle(request)
     }
@@ -61,8 +62,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         for url in urls {
             Log.open.notice("open \(url.path, privacy: .public) option=\(option) browse=\(browse)")
-            openQueue.enqueue(OpenRequest(url: url, browse: browse))
         }
+        openQueue.enqueue(OpenRequest(urls: urls, browse: browse))
     }
 
     /// 点 Dock 图标而没有窗口时，重新显示主窗口。
@@ -103,14 +104,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: 打开入口
 
-    /// 主窗口拖入、⌘O、Services 都走这里；browse 为 nil 时按设置决定。
+    /// 主窗口拖入、⌘O、Services 都走这里；browse 为 nil 时按设置决定。压缩包和普通文件混在一起也行，处理时再分。
     func open(urls: [URL], browse: Bool?) {
         let shouldBrowse = browse ?? (settings.defaultAction == .browse)
         for url in urls {
             Log.open.notice("open(in-app) \(url.path, privacy: .public) browse=\(shouldBrowse)")
-            openQueue.enqueue(OpenRequest(url: url, browse: shouldBrowse))
         }
+        openQueue.enqueue(OpenRequest(urls: urls, browse: shouldBrowse))
         openQueue.start()
+    }
+
+    /// 「用 Piesi 压缩」服务、主窗口「新建压缩包…」：直接进压缩对话框，不经过格式识别。
+    func compress(sources: [URL]) {
+        guard !sources.isEmpty else { return }
+        Task { @MainActor in
+            await compressor.start(sources: sources, parent: nil)
+            maybeAutoQuit()
+        }
+    }
+
+    /// ⌘N：选文件 / 文件夹后进压缩对话框。
+    @objc func newArchive(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.message = "选择要压缩的文件或文件夹"
+        panel.prompt = "压缩"
+        Task { @MainActor in
+            guard await panel.begin() == .OK else { return }
+            compress(sources: panel.urls)
+        }
     }
 
     /// ⌘O：选压缩包后进浏览窗口（设计 6.3：app 内打开 = 浏览）。
@@ -133,18 +157,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: 处理队列
 
-    /// 一个请求的完整处理：识别格式 → 浏览窗口或解压流程。解压会等到做完才返回，保证多文件按顺序来。
+    /// 一批文件的完整处理：按文件头分成压缩包和普通文件。压缩包逐个浏览或解压（解压做完才轮到下一个）；
+    /// 普通文件（拖到 Dock 图标 / 主窗口）合成一个压缩请求。
     private func handle(_ request: OpenRequest) async {
-        let url = request.url
-        guard await CoreBridge.detectFormat(at: url) != nil else {
-            // M4 接压缩对话框；现在先提示
-            await Alerts.error("无法打开「\(url.lastPathComponent)」", "不是支持的压缩包格式。", in: nil)
-            return
+        var archives: [URL] = []
+        var others: [URL] = []
+        for url in request.urls {
+            if await CoreBridge.detectFormat(at: url) != nil {
+                archives.append(url)
+            } else {
+                others.append(url)
+            }
         }
-        if request.browse {
-            BrowserWindowController.open(url: url)
-        } else {
-            await extractor.extractAll(archive: url, parent: nil)
+        for url in archives {
+            if request.browse {
+                BrowserWindowController.open(url: url)
+            } else {
+                await extractor.extractAll(archive: url, parent: nil)
+            }
+        }
+        if !others.isEmpty {
+            await compressor.start(sources: others, parent: nil)
         }
     }
 

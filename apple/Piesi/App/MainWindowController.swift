@@ -1,4 +1,5 @@
-// MainWindowController.swift —— 无参数启动时的主窗口：拖放区 + 打开压缩包。拖入压缩包按设置解压或浏览，按住 ⌥ 拖入一律浏览。
+// MainWindowController.swift —— 无参数启动时的主窗口：拖放区 + 打开压缩包 + 新建压缩包。
+// 拖入压缩包按设置解压或浏览（按住 ⌥ 一律浏览），拖入普通文件进压缩对话框。
 import AppKit
 import SwiftUI
 
@@ -37,11 +38,13 @@ struct MainView: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             dropZone
-            HStack {
+            HStack(spacing: 12) {
                 Button("打开压缩包…") {
                     AppDelegate.shared.openDocument(nil)
                 }
-                .keyboardShortcut("o", modifiers: .command)
+                Button("新建压缩包…") {
+                    AppDelegate.shared.newArchive(nil)
+                }
             }
         }
         .padding(24)
@@ -58,8 +61,8 @@ struct MainView: View {
                 VStack(spacing: 6) {
                     Image(systemName: "doc.zipper")
                         .font(.system(size: 34))
-                    Text("把压缩包拖到这里")
-                    Text("按设置直接解压或先浏览；按住 ⌥ 拖入一律先浏览")
+                    Text("把压缩包或文件拖到这里")
+                    Text("压缩包按设置直接解压或先浏览（按住 ⌥ 一律浏览）；普通文件会新建压缩包")
                         .font(.caption)
                 }
                 .foregroundStyle(.secondary)
