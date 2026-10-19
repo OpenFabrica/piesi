@@ -119,7 +119,7 @@
 ### 5.1 选型与理由（一句话）
 - **核心用 Rust**：解析不可信压缩包是经典攻击面（libarchive、7-Zip 年年出 CVE），内存安全值回票价；一套引擎服务 Mac、Windows、CLI。
 - **UI 用 SwiftUI + AppKit**：Mac 原生感是卖点，Finder/Quick Look/Services 都必须原生写；不用 Tauri/Flutter。
-- **7z = sevenz-rust2 容器 + 它自带的多线程 LZMA2（`from_level_mt`，4×dict 分块）**：sevenz-rust2 有全部 BCJ/BCJ2，兼容性优先。P0 基准若比 `7zz` 慢超过 2 倍，再在 Codec 层接 liblzma 的 raw LZMA2 encoder 做分块并行。不选 7-Zip 的 `7z.so`（COM 风格无文档 API、约 1.5k 行 C++ shim、它的 zip handler 先解码文件名再给你，和编码层打架）。
+- **7z = sevenz-rust2 容器 + liblzma 做 LZMA2 编解码（分块并行）**：sevenz-rust2 有全部 BCJ/BCJ2，兼容性优先。P0 基准（第 12 节）里它自带的纯 Rust LZMA2 压缩、解压都比 `7zz` 慢 2 倍，正好到预案门槛，所以 Codec 层接 liblzma 的 raw LZMA2 encoder/decoder，按 7-Zip 的规则分块。不选 7-Zip 的 `7z.so`（COM 风格无文档 API、约 1.5k 行 C++ shim、它的 zip handler 先解码文件名再给你，和编码层打架）。
 - **ZIP 读取器自写**：中央目录 + local header 约 800 行，编解码和 AES（aes + hmac + pbkdf2）用 crates。原始文件名、编码重解、损坏 CD 的扫描修复、`.z01` 分卷全靠它；写入继续用 `zip` crate。
 - **不 bundle `7zz`/`unrar` 子进程**（Keka 路线）：进度、取消、选择性解压、编码覆盖都难做，也无法移植。
 - **直接分发（Developer ID + 公证）优先**，不先上 MAS：沙盒会卡「解压到压缩包旁边」这类基本操作；core 保持路径无关，日后 MAS 只改 App 层。
@@ -247,7 +247,7 @@ Piesi/
    之后所有编辑、构建、测试都在 `../Piesi-mvp` 里做。写 `CLAUDE.md`、`docs/release.md`、`.gitignore`、许可文件。
 1. **P0 验证（约 1 周）**，两个硬门槛：
    - **兼容语料先过，再谈速度**：收集 7-Zip 9.20/16/23/24、WinRAR 6/7、Bandizip、Finder/ditto、Info-ZIP 产出的包：BCJ/BCJ2/ARM64/Delta/PPMd、头加密、空文件/anti-item、>4 GB、10 万条目、symlink/unix 属性、solid/非 solid、`.001` 与 `.z01` 分卷、GBK/Big5/Shift_JIS/EUC-KR/CP1251 文件名。`piesi-cli` 跑 manifest 全过。
-   - **基准**：1 GB 混合目录 + 单个 2 GB 文件，liblzma 分块并行 vs `7zz` vs lzma-rust2，**压缩和解压都测**，记耗时与峰值内存（`/usr/bin/time -l`）。
+   - **基准**：1 GB 混合目录 + 单个 2 GB 文件，liblzma 分块并行 vs `7zz` vs lzma-rust2，**压缩和解压都测**，记耗时与峰值内存（`/usr/bin/time -l`）。结果见第 12 节。
    - UniFFI 打通到一个空 SwiftUI 窗口：进度回调节流 + 取消令牌 + 单层目录拉取。
    - macOS 26 上复核 Finder/ditto 不写 bit 11（`ditto -c -k` 后用 Python 读 `flag_bits`）。
 2. **P1 MVP（4–6 周）**：zip（自写 reader）/7z/rar/tar 解压、zip/7z 创建、浏览窗口（NSOutlineView）、编码识别 + 常驻选择器、干净默认、cap-std 与 quarantine、255 字节名、分卷、默认处理器、Services、CLI、签名公证、内测。
@@ -269,3 +269,40 @@ Piesi/
 - 开源（MIT OR Apache-2.0），Keka 式分发。
 - 双击直接解压，⌥ 双击或右键才浏览（评审建议先浏览，已记录在 6.3，默认可在设置里切）。
 - 7z 引擎：sevenz-rust2 容器 + liblzma 编解码；zesven 弃用；不用 7z.so / LZMA SDK / libarchive。
+
+## 12. P0 基准结果（2026-10-19）
+
+机器：Apple M5 Pro，18 核，48 GB。对手：7-Zip 26.04（`7zz`）。脚本：`scripts/bench.sh`，耗时是 wall clock，内存是 `/usr/bin/time -l` 的峰值 RSS。
+数据集：mixed = 约 1 GB 混合小文件目录（大部分内容随机，压不动）；big = 单个 2.15 GB 文件（1 MB 的 5 bit 随机块反复出现，每次夹 4 KB 真随机）。
+
+| 任务 | 7zz 26.04 | piesi（9692aee） | 产物大小 7zz / piesi |
+|---|---|---|---|
+| 7z 压缩 mixed（mx5 / level 5） | 47.8 s · 4387 MB | 53.1 s · 4290 MB | 852.6 MB / 853.1 MB |
+| 7z 解压 mixed（7zz 产物） | 1.2 s · 1836 MB | 2.6 s · 2526 MB | |
+| zip 压缩 mixed | 3.2 s · 451 MB | 1.6 s · 593 MB | 867.9 MB / 865.1 MB |
+| zip 解压 mixed | 2.4 s | 2.3 s | |
+| 7z 压缩 big（mx5 / level 5） | 20.8 s · 4096 MB | 40.6 s · 4655 MB | 20.4 MB / 31.1 MB |
+| 7z 解压 big（7zz 产物） | 1.1 s · 2083 MB | 2.1 s · 2400 MB | |
+| zip 压缩 big | 54.0 s · 9 MB | 27.0 s · 6 MB | 1363.5 MB / 1376.0 MB |
+| zip 解压 big | 7.8 s | 6.9 s | |
+
+第一轮（solid 块串行压缩时）piesi 7z 压缩 mixed 是 151.1 s / 288 MB；改成多个 solid 块并行后降到 53.1 s，内存涨到和 7zz 一样的 4.3 GB。
+
+### 结论
+- **ZIP 达标**：压缩比 7zz 快 2 倍（自写并行写入器 + zlib-rs），解压持平，体积差 1% 以内。
+- **7z 容器与兼容达标**：7zz 能开 piesi 产物，piesi 能开 7zz 产物（`scripts/smoke.sh`）。
+- **7z 速度没达标**：压缩 big 慢 1.95 倍，解压慢 1.9–2.2 倍。瓶颈是 lzma-rust2 的纯 Rust LZMA2 编解码，单线程吞吐约为 7-Zip 的一半。按 5.1 的预案接 liblzma（vendor/sevenz-rust2 + `[patch.crates-io]`），目标：压缩、解压都 ≤ 7zz × 1.3。
+- **7z 大文件体积差 10.7 MB 的根因是分块，不是编码质量**：用 `scripts/lzma2_blocks.py` 走 LZMA2 chunk 链数字典重置：7zz 把 big 切成 17 个 128 MB 独立块，piesi 切成 33 个 64 MB 块（4 × 16 MB 字典）。每个独立块都要重存一份 1 MB 重复数据（约 0.65 MB），多 16 块 ≈ 10.4 MB，和实测差值吻合。mixed 产物只差 0.05%。
+- **内存要加闸**：7z 压缩两边都 4–4.7 GB。7zz 有 memuse 上限会自动减线程；piesi 只限制了 solid 块并发，块内 LZMA2 线程没按内存限制，8 GB 的 Mac 上会被挤爆。处理：每个 worker 按「块 + 输出缓冲 + 编码器内存」计，预算取物理内存的一半，solid 块并发和块内线程共用这个预算。
+
+### 7zz 26.04 的字典与分块（实测，300 MB 样本，18 线程）
+
+| 级别 | 字典 | 独立块 |
+|---|---|---|
+| mx1 | 256 KB | 1 MB |
+| mx3 | 4 MB | 16 MB |
+| mx5 | 32 MB | 128 MB |
+| mx7 | 128 MB | 256 MB |
+| mx9 | 256 MB | 256 MB |
+
+规则就是 7-Zip Lzma2Enc 的：块 = clamp(4 × 字典, 1 MB, 256 MB)；`-mmt1` 时不分块。piesi 的字典表改成和它一致（1→256 KB，3→4 MB，5→32 MB，7→128 MB，9→256 MB，偶数档取中间值），块按同一规则算。
