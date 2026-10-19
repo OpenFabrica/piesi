@@ -162,7 +162,13 @@ fn open_stream(path: &Path, format: Format) -> Result<Box<dyn Read>> {
         // 多成员 gzip（pigz、--rsyncable 产物）要用 MultiGzDecoder 才能连续解到底
         Format::TarGz | Format::Gz => Box::new(flate2::bufread::MultiGzDecoder::new(file)),
         Format::TarBz2 | Format::Bz2 => Box::new(bzip2::bufread::MultiBzDecoder::new(file)),
-        Format::TarXz | Format::Xz => Box::new(liblzma::bufread::XzDecoder::new_multi_decoder(file)),
+        // 带内存上限的自动解码器（.xz 与 .lzma 都认，多流连续解）：头里声明的字典超过上限就报错，
+        // 不然 42 字节的恶意输入就能让解码器分配 4 GB（模糊测试抓到的）
+        Format::TarXz | Format::Xz => {
+            let stream = liblzma::stream::Stream::new_auto_decoder(crate::sys::decode_memlimit(), liblzma::stream::CONCATENATED)
+                .map_err(|e| Error::Io(e.into()))?;
+            Box::new(liblzma::bufread::XzDecoder::new_stream(file, stream))
+        }
         Format::TarZst | Format::Zst => Box::new(zstd::stream::read::Decoder::with_buffer(file)?),
         other => return Err(Error::Unsupported(other.display_name().to_owned())),
     })

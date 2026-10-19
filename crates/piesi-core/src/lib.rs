@@ -12,6 +12,7 @@ pub mod fs;
 pub mod names;
 pub mod plan;
 pub mod progress;
+pub mod sys;
 pub mod volumes;
 
 pub use archive::{ArchiveReader, Entry, EntryId, EntryKind, Format, IndexState, Method, PasswordNeed};
