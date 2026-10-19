@@ -223,6 +223,9 @@ Piesi/
     piesi-ffi/                  只放 uniffi 导出与 record/enum，无逻辑
     piesi-cli/                  clap；同时是语料回归测试入口
   tests/corpus/                 7zz / zip / WinRAR / Bandizip / Finder 产出的夹具 + manifest.json（预期名单）
+  vendor/sevenz-rust2/          上游 0.24.1 副本 + liblzma 补丁（PIESI-PATCH.md），根 Cargo.toml 用 [patch.crates-io] 指向它
+  fuzz/                         cargo-fuzz 工程（open_any 目标、seed.sh、regressions/ 回放样本）
+  .cargo/config.toml            给 C 编译开 TUKLIB_FAST_UNALIGNED_ACCESS（liblzma 编码快 2.5 倍）
   apple/
     project.yml                 xcodegen 定义（.xcodeproj 不入库）
     Config/Version.xcconfig     MARKETING_VERSION + VERSION_SUFFIX（按发版规范）
