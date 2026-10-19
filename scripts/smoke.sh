@@ -58,7 +58,7 @@ echo "## 3. 7zz 建包（含 BCJ2、solid、AES、GBK 名）→ piesi 解压"
 for f in ref.7z ref.zip; do
   d="$T/y-$f"; mkdir -p "$d"
   "$PIESI" x -q -o "$d" "$T/$f"
-  diff -r --exclude=.DS_Store --exclude=__MACOSX "$SRC" "$d/源目录 测试" || fail "$f（7zz 产物）解压不一致"
+  diff -r --exclude=.DS_Store --exclude=__MACOSX "$SRC" "$d/源目录 测试" || fail "${f}（7zz 产物）解压不一致"
 done
 d="$T/y-enc"; mkdir -p "$d"
 "$PIESI" x -q -o "$d" -p SECRET "$T/enc.7z"

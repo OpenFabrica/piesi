@@ -25,7 +25,7 @@ case "$RUST_VER" in
   *-dev*) PKG_VER="${RUST_VER}-${GIT_HASH}${DIRTY}" ;;
   *) PKG_VER="$RUST_VER" ;;
 esac
-echo "打包版本：$PKG_VER（签名：$IDENTITY）"
+echo "打包版本：${PKG_VER}（签名：${IDENTITY}）"
 
 scripts/build-core.sh
 ( cd apple && xcodegen generate )
