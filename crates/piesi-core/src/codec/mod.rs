@@ -12,15 +12,21 @@ const MAX_LZMA_DICT: u32 = 1536 << 20;
 /// 按压缩方法把原始压缩流 `raw` 包成明文 `Read`。
 /// `props` 是 7z 风格的编码器属性（LZMA 5 字节、LZMA2 1 字节、PPMd 5 字节）；
 /// 传空时 LZMA/PPMd 按 zip 的约定从流头部自行读取参数（zip 把参数放在数据流开头，不放扩展字段）。
-pub fn decoder<'a>(method: &Method, raw: Box<dyn Read + 'a>, props: &[u8]) -> Result<Box<dyn Read + 'a>> {
+/// `unpacked` 是容器声明的解压后大小（不知道传 u64::MAX）：LZMA 的字典按它收紧，
+/// 因为匹配距离不可能超过已产出的字节数，字典没必要大于整个条目；不收紧就是几十字节的恶意头换 1.5 GB 分配。
+pub fn decoder<'a>(method: &Method, raw: Box<dyn Read + 'a>, props: &[u8], unpacked: u64) -> Result<Box<dyn Read + 'a>> {
     Ok(match method {
         Method::Store => raw,
         Method::Deflate => Box::new(flate2::read::DeflateDecoder::new(raw)),
         Method::Deflate64 => Box::new(deflate64::Deflate64Decoder::new(raw)),
         Method::Bzip2 => Box::new(bzip2::read::BzDecoder::new(raw)),
-        Method::Lzma => lzma_decoder(raw, props)?,
-        Method::Lzma2 => lzma2_decoder(raw, props)?,
-        Method::Xz => Box::new(liblzma::read::XzDecoder::new(raw)),
+        Method::Lzma => lzma_decoder(raw, props, unpacked)?,
+        Method::Lzma2 => lzma2_decoder(raw, props, unpacked)?,
+        Method::Xz => {
+            // 带内存上限：.xz 头可声明 4 GB 字典，解码器开场就按它分配
+            let stream = liblzma::stream::Stream::new_stream_decoder(crate::sys::decode_memlimit(), 0).map_err(Error::corrupt)?;
+            Box::new(liblzma::read::XzDecoder::new_stream(raw, stream))
+        }
         Method::Zstd => Box::new(zstd::stream::read::Decoder::new(raw).map_err(Error::corrupt)?),
         Method::Ppmd => ppmd_decoder(raw, props)?,
         other => return Err(Error::Unsupported(format!("压缩方法 {other}"))),
@@ -30,6 +36,12 @@ pub fn decoder<'a>(method: &Method, raw: Box<dyn Read + 'a>, props: &[u8]) -> Re
 /// 读满 `buf`，读不满按「压缩包损坏」处理（流头部的参数必须完整）。
 fn read_header(raw: &mut dyn Read, buf: &mut [u8], what: &str) -> Result<()> {
     raw.read_exact(buf).map_err(|_| Error::Corrupt(format!("{what}：流头部不完整")))
+}
+
+/// 解码器实际用的字典：声明值与「解压后大小」取小，再不低于 liblzma 的下限 4 KB。
+fn clamp_dict(declared: u32, unpacked: u64) -> u32 {
+    let needed = unpacked.clamp(4096, u64::from(u32::MAX)) as u32;
+    declared.min(needed).max(4096)
 }
 
 /// 校验 5 字节 LZMA 属性：首字节 lc/lp/pb 编码必须 < 225，字典大小不能离谱。
@@ -46,7 +58,7 @@ fn check_lzma_props(props: &[u8; 5]) -> Result<()> {
 
 /// LZMA1 原始流。zip（方法 14）的流头是「2 字节版本 + 2 字节属性长度 + 属性」，之后才是 LZMA 数据；
 /// 7z 则把 5 字节属性放在 folder 里，经 `props` 传入。
-fn lzma_decoder<'a>(mut raw: Box<dyn Read + 'a>, props: &[u8]) -> Result<Box<dyn Read + 'a>> {
+fn lzma_decoder<'a>(mut raw: Box<dyn Read + 'a>, props: &[u8], unpacked: u64) -> Result<Box<dyn Read + 'a>> {
     let mut p = [0u8; 5];
     if props.is_empty() {
         // zip 头：版本号只做记录，属性长度理论上恒为 5，但有些写入器会多写，所以按声明长度跳过多余字节
@@ -65,6 +77,9 @@ fn lzma_decoder<'a>(mut raw: Box<dyn Read + 'a>, props: &[u8]) -> Result<Box<dyn
         return Err(Error::Corrupt("LZMA 属性不足 5 字节".into()));
     }
     check_lzma_props(&p)?;
+    // 字典按解压后大小收紧（liblzma 要求至少 4 KB），只改分配量，不改解码结果
+    let dict = u32::from_le_bytes([p[1], p[2], p[3], p[4]]);
+    p[1..5].copy_from_slice(&clamp_dict(dict, unpacked).to_le_bytes());
     let mut filters = liblzma::stream::Filters::new();
     filters.lzma1_properties(&p).map_err(Error::corrupt)?;
     let stream = liblzma::stream::Stream::new_raw_decoder(&filters).map_err(Error::corrupt)?;
@@ -72,7 +87,7 @@ fn lzma_decoder<'a>(mut raw: Box<dyn Read + 'a>, props: &[u8]) -> Result<Box<dyn
 }
 
 /// LZMA2 原始流（7z 用），属性 1 字节编码字典大小。
-fn lzma2_decoder<'a>(raw: Box<dyn Read + 'a>, props: &[u8]) -> Result<Box<dyn Read + 'a>> {
+fn lzma2_decoder<'a>(raw: Box<dyn Read + 'a>, props: &[u8], unpacked: u64) -> Result<Box<dyn Read + 'a>> {
     if props.is_empty() {
         return Err(Error::Corrupt("LZMA2 缺少属性字节".into()));
     }
@@ -80,8 +95,12 @@ fn lzma2_decoder<'a>(raw: Box<dyn Read + 'a>, props: &[u8]) -> Result<Box<dyn Re
     if props[0] >= 40 {
         return Err(Error::Unsupported("LZMA2 字典过大".into()));
     }
+    // 属性字节 → 字典：(2 | (p & 1)) << (p / 2 + 11)，再按解压后大小收紧
+    let declared = (2u32 | u32::from(props[0] & 1)) << (props[0] / 2 + 11);
+    let mut opts = liblzma::stream::LzmaOptions::new();
+    opts.dict_size(clamp_dict(declared, unpacked));
     let mut filters = liblzma::stream::Filters::new();
-    filters.lzma2_properties(&props[..1]).map_err(Error::corrupt)?;
+    filters.lzma2(&opts);
     let stream = liblzma::stream::Stream::new_raw_decoder(&filters).map_err(Error::corrupt)?;
     Ok(Box::new(liblzma::read::XzDecoder::new_stream(raw, stream)))
 }
@@ -107,6 +126,10 @@ fn ppmd_decoder<'a>(mut raw: Box<dyn Read + 'a>, props: &[u8]) -> Result<Box<dyn
     } else if props.len() >= 5 {
         let order = props[0] as u32;
         let mem = u32::from_le_bytes([props[1], props[2], props[3], props[4]]);
+        // PPMd 的模型内存必须和编码时一致，不能收紧，只能封顶：超过解码内存上限的声明一律拒绝
+        if u64::from(mem) > crate::sys::decode_memlimit() {
+            return Err(Error::Unsupported(format!("PPMd 内存需求过大：{} MB", mem >> 20)));
+        }
         let dec = ppmd_rust::Ppmd7Decoder::new(BufReader::new(raw), order, mem)
             .map_err(|e| Error::Corrupt(format!("PPMd 参数非法：{e}")))?;
         Ok(Box::new(dec))
@@ -127,7 +150,7 @@ mod tests {
         let mut enc = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
         enc.write_all(&data).unwrap();
         let packed = enc.finish().unwrap();
-        let mut dec = decoder(&Method::Deflate, Box::new(&packed[..]), &[]).unwrap();
+        let mut dec = decoder(&Method::Deflate, Box::new(&packed[..]), &[], u64::MAX).unwrap();
         let mut out = Vec::new();
         dec.read_to_end(&mut out).unwrap();
         assert_eq!(out, data);
@@ -136,14 +159,14 @@ mod tests {
     /// 不认识的方法要返回 Unsupported 而不是 panic。
     #[test]
     fn unknown_method_is_unsupported() {
-        let r = decoder(&Method::Rar(5), Box::new(&b""[..]), &[]);
+        let r = decoder(&Method::Rar(5), Box::new(&b""[..]), &[], u64::MAX);
         assert!(matches!(r, Err(Error::Unsupported(_))));
     }
 
     /// zip LZMA 流头不完整时返回 Corrupt。
     #[test]
     fn lzma_short_header_is_corrupt() {
-        let r = decoder(&Method::Lzma, Box::new(&b"\x09\x14\x05"[..]), &[]);
+        let r = decoder(&Method::Lzma, Box::new(&b"\x09\x14\x05"[..]), &[], u64::MAX);
         assert!(matches!(r, Err(Error::Corrupt(_))));
     }
 }

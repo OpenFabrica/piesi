@@ -250,7 +250,7 @@ fn process_entry<T>(
         Decrypt::Plain(raw_reader)
     };
 
-    let decoder = codec::decoder(&entry.method, Box::new(&mut dec), &[])?;
+    let decoder = codec::decoder(&entry.method, Box::new(&mut dec), &[], entry.size)?;
     let mut er = EntryReader {
         inner: decoder,
         remaining: entry.size,
