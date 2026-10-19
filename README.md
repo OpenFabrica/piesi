@@ -23,6 +23,8 @@ piesi a 输出.7z --level 7 目录      # 创建 7z（多线程 LZMA2，solid �
 piesi a 输出.tar.zst 目录           # tar.gz / tar.xz / tar.zst
 ```
 
+Quick Look 扩展已可用：在 Finder 里按空格预览 zip / 7z / rar / tar 的条目树（只读索引，不解压）。macOS app 的解压流程、浏览窗口、Finder 右键 Services 正在做。
+
 支持读取：zip（zip64、AES、ZipCrypto、`.zip.001`、`.z01` 分卷）、7z（BCJ/BCJ2/ARM64、solid、头加密、`.7z.001`）、rar（v4/v5、分卷、加密）、tar 及 tar.gz/bz2/xz/zst、单文件 gz/bz2/xz/zst。
 支持创建：zip、7z、tar.gz、tar.xz、tar.zst。macOS app 与 Quick Look 扩展在 `apple/`。
 
