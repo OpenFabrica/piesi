@@ -1,0 +1,166 @@
+// AppDelegate.swift —— AppKit 委托：启动流程、Finder 打开事件、主窗口、自动退出。
+import AppKit
+import UniformTypeIdentifiers
+
+/// 应用委托。Finder 的 open 事件在 didFinishLaunching 之前就会到，所以先进队列，启动完成后再按设置处理。
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// 全局入口（NSApp.delegate 是弱引用，这里是强引用）
+    static var shared: AppDelegate!
+
+    let settings = AppSettings()
+    let taskCenter = TaskCenter()
+    private(set) lazy var tasksWindow = TasksWindowController(center: taskCenter)
+    private(set) lazy var extractor = ExtractCoordinator(taskCenter: taskCenter, settings: settings, tasksWindow: tasksWindow)
+    private lazy var openQueue = OpenQueue { [weak self] request in
+        await self?.handle(request)
+    }
+    /// 是否因为打开文件而启动：这种情况下不弹主窗口，做完自动退出（设计 6.3）
+    private var launchedForFiles = false
+    private var finishedLaunching = false
+    private var mainWindowController: MainWindowController?
+
+    // MARK: 生命周期
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        finishedLaunching = true
+        taskCenter.onChange = { [weak self] in
+            guard let self else { return }
+            tasksWindow.sync()
+            maybeAutoQuit()
+        }
+        openQueue.onIdle = { [weak self] in self?.maybeAutoQuit() }
+        // 窗口关闭通知到达时窗口还没真正消失，下一轮 runloop 再判断是否该退出
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in AppDelegate.shared?.maybeAutoQuit() }
+        }
+        if !launchedForFiles {
+            showMainWindow()
+        }
+        NSApp.activate()
+        openQueue.start()
+    }
+
+    /// Finder 双击 / 拖到 Dock / open 命令。⌥ 双击 = 浏览（设计 6.3）；open 事件不带按键，读当前硬件修饰键。
+    func application(_ application: NSApplication, open urls: [URL]) {
+        let option = NSEvent.modifierFlags.contains(.option)
+        let browse = option || settings.forceBrowse || settings.defaultAction == .browse
+        if !finishedLaunching {
+            launchedForFiles = true
+        }
+        for url in urls {
+            Log.open.notice("open \(url.path, privacy: .public) option=\(option) browse=\(browse)")
+            openQueue.enqueue(OpenRequest(url: url, browse: browse))
+        }
+    }
+
+    /// 点 Dock 图标而没有窗口时，重新显示主窗口。
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            showMainWindow()
+        }
+        return false
+    }
+
+    /// 自动退出由 maybeAutoQuit 决定，不用系统的「最后一个窗口关闭就退出」。
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    /// 还有任务在跑时退出要确认，避免写一半的文件。
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard taskCenter.hasRunning else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = "有 \(taskCenter.runningCount) 个任务正在进行"
+        alert.informativeText = "现在退出会中断这些任务，已写出的文件可能不完整。"
+        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: "中断并退出")
+        alert.buttons[1].hasDestructiveAction = true
+        if alert.runModal() == .alertSecondButtonReturn {
+            taskCenter.cancelAll()
+            return .terminateNow
+        }
+        return .terminateCancel
+    }
+
+    // MARK: 打开入口
+
+    /// 主窗口拖入、⌘O、Services 都走这里；browse 为 nil 时按设置决定。
+    func open(urls: [URL], browse: Bool?) {
+        let shouldBrowse = browse ?? (settings.defaultAction == .browse)
+        for url in urls {
+            Log.open.notice("open(in-app) \(url.path, privacy: .public) browse=\(shouldBrowse)")
+            openQueue.enqueue(OpenRequest(url: url, browse: shouldBrowse))
+        }
+        openQueue.start()
+    }
+
+    /// ⌘O：选压缩包后进浏览窗口（设计 6.3：app 内打开 = 浏览）。
+    @objc func openDocument(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = ArchiveTypes.all
+        panel.message = "选择要浏览的压缩包"
+        Task { @MainActor in
+            guard await panel.begin() == .OK else { return }
+            open(urls: panel.urls, browse: true)
+        }
+    }
+
+    /// 窗口菜单：显示任务浮窗。
+    @objc func showTasksWindow(_ sender: Any?) {
+        tasksWindow.show()
+    }
+
+    // MARK: 处理队列
+
+    /// 一个请求的完整处理：识别格式 → 浏览窗口或解压流程。解压会等到做完才返回，保证多文件按顺序来。
+    private func handle(_ request: OpenRequest) async {
+        let url = request.url
+        guard await CoreBridge.detectFormat(at: url) != nil else {
+            // M4 接压缩对话框；现在先提示
+            await Alerts.error("无法打开「\(url.lastPathComponent)」", "不是支持的压缩包格式。", in: nil)
+            return
+        }
+        if request.browse {
+            BrowserWindowController.open(url: url)
+        } else {
+            await extractor.extractAll(archive: url, parent: nil)
+        }
+    }
+
+    // MARK: 窗口与退出
+
+    /// 显示主窗口（无参数启动、点 Dock 图标）。
+    func showMainWindow() {
+        if mainWindowController == nil {
+            mainWindowController = MainWindowController()
+        }
+        mainWindowController?.showWindow(nil)
+        NSApp.activate()
+    }
+
+    /// 因打开文件而启动、队列空、没有任务在跑、没有别的窗口 → 退出（设置项可关）。
+    /// 任务浮窗和各种对话框都是 NSPanel，不算「别的窗口」。
+    func maybeAutoQuit() {
+        guard launchedForFiles, finishedLaunching, settings.autoQuit else { return }
+        guard openQueue.isIdle, !taskCenter.hasRunning else { return }
+        let userWindows = NSApp.windows.filter { $0.isVisible && !($0 is NSPanel) }
+        guard userWindows.isEmpty else { return }
+        Log.app.notice("tasks finished and no window left, quitting")
+        NSApp.terminate(nil)
+    }
+}
+
+/// Info.plist 里声明的压缩包类型（CFBundleDocumentTypes），打开面板和「设为默认」共用，只存一处。
+enum ArchiveTypes {
+    static var identifiers: [String] {
+        let types = Bundle.main.infoDictionary?["CFBundleDocumentTypes"] as? [[String: Any]] ?? []
+        return types.flatMap { $0["LSItemContentTypes"] as? [String] ?? [] }
+    }
+
+    static var all: [UTType] {
+        identifiers.compactMap { UTType($0) }
+    }
+}
