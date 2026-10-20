@@ -15,11 +15,13 @@ enum Alerts {
 
     /// 错误提示，只有一个「好」。
     static func error(_ title: String, _ message: String, in parent: NSWindow?) async {
+        // 弹过的错误也进统一日志：没有 UI 自动化时靠它核对文案（含本地化）
+        Log.app.error("alert: \(title, privacy: .public) — \(message, privacy: .public)")
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = title
         alert.informativeText = message
-        alert.addButton(withTitle: "好")
+        alert.addButton(withTitle: String(localized: "好"))
         _ = await present(alert, in: parent)
     }
 }

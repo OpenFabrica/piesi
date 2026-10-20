@@ -29,3 +29,6 @@ Cargo.lock.bak
 /fuzz/corpus/
 /fuzz/artifacts/
 /fuzz/Cargo.lock
+
+# Python 脚本缓存（apple/scripts）
+__pycache__/

@@ -617,30 +617,30 @@
         }
       }
     },
-    "ZIP · 级别 5": {
+    "ZIP · 保留 Finder 标签等 Mac 元数据": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "ZIP · Level 5"
+            "value": "ZIP · Keeps Finder tags and other Mac metadata"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ZIP · レベル 5"
+            "value": "ZIP · Finder タグなどの Mac メタデータを保持"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "ZIP · 级别 5"
+            "value": "ZIP · 保留 Finder 标签等 Mac 元数据"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "ZIP · 等級 5"
+            "value": "ZIP · 保留 Finder 標籤等 Mac 中繼資料"
           }
         }
       }
@@ -981,6 +981,34 @@
         }
       }
     },
+    "仅显示前 %lld 条": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing only the first %lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先頭の %lld 件のみ表示"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅显示前 %lld 条"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅顯示前 %lld 筆"
+          }
+        }
+      }
+    },
     "以后再说": {
       "localizations": {
         "en": {
@@ -1061,6 +1089,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "位置"
+          }
+        }
+      }
+    },
+    "保留 Mac 元数据（Finder 标签、资源分支，写进 __MACOSX）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Mac metadata (Finder tags, resource forks; stored in __MACOSX)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac メタデータを保持（Finder タグ、リソースフォーク。__MACOSX に保存）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留 Mac 元数据（Finder 标签、资源分支，写进 __MACOSX）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留 Mac 中繼資料（Finder 標籤、資源分支，寫進 __MACOSX）"
           }
         }
       }
@@ -2465,6 +2521,34 @@
         }
       }
     },
+    "扩展名是压缩包，但内容无法识别，文件可能已损坏或没有下载完整。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The extension says it’s an archive, but the contents aren’t recognized. The file may be damaged or not fully downloaded."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拡張子はアーカイブですが内容を認識できません。ファイルが壊れているか、ダウンロードが完了していない可能性があります。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "扩展名是压缩包，但内容无法识别，文件可能已损坏或没有下载完整。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "副檔名是壓縮檔，但內容無法識別，檔案可能已損壞或沒有下載完整。"
+          }
+        }
+      }
+    },
     "把 Piesi 设为默认的解压工具？": {
       "localizations": {
         "en": {
@@ -2517,6 +2601,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "把壓縮檔或檔案拖到這裡"
+          }
+        }
+      }
+    },
+    "拖出「%@」失败": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t Drag Out “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」のドラッグ書き出しに失敗しました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖出「%@」失败"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖出「%@」失敗"
           }
         }
       }

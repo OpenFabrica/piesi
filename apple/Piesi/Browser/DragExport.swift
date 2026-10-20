@@ -56,7 +56,7 @@ final class EntryPromiseDelegate: NSObject, NSFilePromiseProviderDelegate, @unch
             let name = row.name
             Log.browser.error("drag export failed \(self.row.path, privacy: .public): \(message, privacy: .public)")
             Task { @MainActor in
-                await Alerts.error("拖出「\(name)」失败", message, in: nil)
+                await Alerts.error(String(localized: "拖出「\(name)」失败"), message, in: nil)
             }
             completionHandler(error)
         }
@@ -87,7 +87,7 @@ enum DragExport {
 
         let produced = temp.appendingPathComponent(row.path)
         guard fm.fileExists(atPath: produced.path) else {
-            throw PiesiError.Other(message: "解出的文件不在预期位置：\(row.path)")
+            throw PiesiError.Other(message: String(localized: "解出的文件不在预期位置：\(row.path)"))
         }
         // 目标已存在时直接替换是安全的：Finder 给的 url 要么是它刚起的不冲突的名字，要么是用户在冲突提示里选了「替换」
         if fm.fileExists(atPath: destination.path) {

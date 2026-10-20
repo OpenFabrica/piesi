@@ -102,10 +102,10 @@ final class TaskItem: Identifiable {
             if bytesPerSecond > 0 {
                 parts.append("\(ByteText.string(bytesPerSecond))/s")
             }
-            return parts.isEmpty ? "准备中…" : parts.joined(separator: " · ")
-        case .done: return "完成"
-        case .failed: return "失败"
-        case .cancelled: return "已取消"
+            return parts.isEmpty ? String(localized: "准备中…") : parts.joined(separator: " · ")
+        case .done: return String(localized: "完成")
+        case .failed: return String(localized: "失败")
+        case .cancelled: return String(localized: "已取消")
         }
     }
 }

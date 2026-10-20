@@ -95,11 +95,11 @@ struct ArchiveOutlineView: NSViewRepresentable {
         static let kind = NSUserInterfaceItemIdentifier("kind")
 
         static let all: [ColumnSpec] = [
-            ColumnSpec(id: name, title: "名称", width: 300),
-            ColumnSpec(id: size, title: "大小", width: 80),
-            ColumnSpec(id: packed, title: "压缩后", width: 80),
-            ColumnSpec(id: mtime, title: "修改时间", width: 140),
-            ColumnSpec(id: kind, title: "类型", width: 120),
+            ColumnSpec(id: name, title: String(localized: "名称"), width: 300),
+            ColumnSpec(id: size, title: String(localized: "大小"), width: 80),
+            ColumnSpec(id: packed, title: String(localized: "压缩后"), width: 80),
+            ColumnSpec(id: mtime, title: String(localized: "修改时间"), width: 140),
+            ColumnSpec(id: kind, title: String(localized: "类型"), width: 120),
         ]
     }
 
@@ -424,19 +424,19 @@ struct ArchiveOutlineView: NSViewRepresentable {
         private func kindText(_ row: Row) -> String {
             var text: String
             switch row.kind {
-            case .dir: text = "文件夹"
-            case .symlink: text = "符号链接"
+            case .dir: text = String(localized: "文件夹")
+            case .symlink: text = String(localized: "符号链接")
             case .file:
                 let ext = (row.name as NSString).pathExtension.lowercased()
                 if let cached = kindTextCache[ext] {
                     text = cached
                 } else {
-                    text = ext.isEmpty ? "文件" : (UTType(filenameExtension: ext)?.localizedDescription ?? "\(ext.uppercased()) 文件")
+                    text = ext.isEmpty ? String(localized: "文件") : (UTType(filenameExtension: ext)?.localizedDescription ?? String(localized: "\(ext.uppercased()) 文件"))
                     kindTextCache[ext] = text
                 }
             }
             if row.encrypted {
-                text += "（加密）"
+                text += String(localized: "（加密）")
             }
             return text
         }

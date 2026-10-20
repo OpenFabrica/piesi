@@ -109,7 +109,7 @@ struct BrowserView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
             if !model.debouncedQuery.isEmpty, model.searchHitLimit {
-                Text("仅显示前 \(ArchiveOutlineView.Coordinator.searchLimit) 条")
+                Text("仅显示前 \(Int(ArchiveOutlineView.Coordinator.searchLimit)) 条")
                     .font(.callout)
                     .foregroundStyle(.orange)
             }

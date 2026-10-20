@@ -115,13 +115,13 @@ extension Encoding: CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .utf8: "UTF-8"
-        case .gb18030: "GB18030（简体中文）"
-        case .big5: "Big5（繁体中文）"
-        case .shiftJis: "Shift_JIS（日文）"
-        case .eucKr: "EUC-KR（韩文）"
-        case .cp1251: "CP1251（西里尔）"
-        case .cp866: "CP866（DOS 西里尔）"
-        case .cp1252: "CP1252（西欧）"
+        case .gb18030: String(localized: "GB18030（简体中文）")
+        case .big5: String(localized: "Big5（繁体中文）")
+        case .shiftJis: String(localized: "Shift_JIS（日文）")
+        case .eucKr: String(localized: "EUC-KR（韩文）")
+        case .cp1251: String(localized: "CP1251（西里尔）")
+        case .cp866: String(localized: "CP866（DOS 西里尔）")
+        case .cp1252: String(localized: "CP1252（西欧）")
         }
     }
 

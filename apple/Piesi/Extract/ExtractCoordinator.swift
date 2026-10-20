@@ -48,7 +48,7 @@ final class ExtractCoordinator {
             handle = try await CoreBridge.open(url)
         } catch {
             Log.extract.error("open failed \(url.path, privacy: .public): \(CoreBridge.message(for: error), privacy: .public)")
-            await Alerts.error("无法打开「\(name)」", CoreBridge.message(for: error), in: parent)
+            await Alerts.error(String(localized: "无法打开「\(name)」"), CoreBridge.message(for: error), in: parent)
             return false
         }
 
@@ -58,7 +58,7 @@ final class ExtractCoordinator {
             do {
                 try await CoreBridge.setPassword(handle, password)
             } catch {
-                await Alerts.error("无法打开「\(name)」", CoreBridge.message(for: error), in: parent)
+                await Alerts.error(String(localized: "无法打开「\(name)」"), CoreBridge.message(for: error), in: parent)
                 return false
             }
         } else if handle.passwordState() != .notNeeded {
@@ -83,11 +83,11 @@ final class ExtractCoordinator {
         do {
             plan = try await CoreBridge.plan(handle, request)
         } catch {
-            await Alerts.error("无法解压「\(name)」", CoreBridge.message(for: error), in: parent)
+            await Alerts.error(String(localized: "无法解压「\(name)」"), CoreBridge.message(for: error), in: parent)
             return false
         }
         for warning in plan.warnings {
-            Log.extract.warning("plan \(name, privacy: .public): \(warning, privacy: .public)")
+            Log.extract.warning("plan \(name, privacy: .public): \(warning.localizedText, privacy: .public)")
         }
 
         // 5. 冲突：目标里已有同名项目，问策略（默认改名）
@@ -101,14 +101,14 @@ final class ExtractCoordinator {
             let ratio = plan.archiveBytes > 0 ? Double(plan.totalBytes) / Double(plan.archiveBytes) : 0
             if ratio > bombRatio {
                 await Alerts.error(
-                    "「\(name)」可能是压缩炸弹",
-                    "包只有 \(ByteText.string(plan.archiveBytes))，展开却要 \(ByteText.string(plan.totalBytes))，超过磁盘剩余的 \(ByteText.string(available))。已停止。",
+                    String(localized: "「\(name)」可能是压缩炸弹"),
+                    String(localized: "包只有 \(ByteText.string(plan.archiveBytes))，展开却要 \(ByteText.string(plan.totalBytes))，超过磁盘剩余的 \(ByteText.string(available))。已停止。"),
                     in: parent
                 )
             } else {
                 await Alerts.error(
-                    "磁盘空间不足",
-                    "解压「\(name)」需要 \(ByteText.string(plan.totalBytes))，目标卷只剩 \(ByteText.string(available))。",
+                    String(localized: "磁盘空间不足"),
+                    String(localized: "解压「\(name)」需要 \(ByteText.string(plan.totalBytes))，目标卷只剩 \(ByteText.string(available))。"),
                     in: parent
                 )
             }
@@ -126,7 +126,7 @@ final class ExtractCoordinator {
                 taskCenter.finish(item, state: .done)
                 Log.extract.notice("done \(url.path, privacy: .public) → \(result.root, privacy: .public) extracted=\(result.extracted) skipped=\(result.skipped) junk=\(result.skippedJunk) warnings=\(result.warnings.count)")
                 for warning in result.warnings {
-                    Log.extract.warning("extract \(name, privacy: .public): \(warning, privacy: .public)")
+                    Log.extract.warning("extract \(name, privacy: .public): \(warning.localizedText, privacy: .public)")
                 }
                 finish(result: result, archive: url, wholeArchive: ids.isEmpty)
                 return true
@@ -144,7 +144,7 @@ final class ExtractCoordinator {
                 let message = CoreBridge.message(for: error)
                 taskCenter.finish(item, state: .failed(message))
                 Log.extract.error("failed \(name, privacy: .public): \(message, privacy: .public)")
-                await Alerts.error("解压「\(name)」失败", message, in: parent)
+                await Alerts.error(String(localized: "解压「\(name)」失败"), message, in: parent)
                 return false
             }
         }
@@ -163,7 +163,7 @@ final class ExtractCoordinator {
                     wrong = true
                     continue
                 }
-                await Alerts.error("无法打开「\(name)」", CoreBridge.message(for: error), in: parent)
+                await Alerts.error(String(localized: "无法打开「\(name)」"), CoreBridge.message(for: error), in: parent)
                 return nil
             }
         }

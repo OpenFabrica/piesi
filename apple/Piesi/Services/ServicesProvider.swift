@@ -13,7 +13,7 @@ final class ServicesProvider: NSObject {
     @objc func compressWithPiesi(_ pasteboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         let urls = fileURLs(from: pasteboard)
         guard !urls.isEmpty else {
-            error.pointee = "没有收到文件"
+            error.pointee = String(localized: "没有收到文件") as NSString
             return
         }
         Log.open.notice("service compress: \(urls.count) files")
@@ -29,7 +29,7 @@ final class ServicesProvider: NSObject {
     private func handle(_ pasteboard: NSPasteboard, error: AutoreleasingUnsafeMutablePointer<NSString?>, browse: Bool) {
         let urls = fileURLs(from: pasteboard)
         guard !urls.isEmpty else {
-            error.pointee = "没有收到文件"
+            error.pointee = String(localized: "没有收到文件") as NSString
             return
         }
         Log.open.notice("service \(browse ? "browse" : "extract-here", privacy: .public): \(urls.count) files")

@@ -11,7 +11,7 @@ final class SettingsWindowController: NSWindowController {
         hosting.sizingOptions = []
         let window = NSWindow(contentViewController: hosting)
         window.setContentSize(NSSize(width: 480, height: 470))
-        window.title = "设置"
+        window.title = String(localized: "设置")
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.setFrameAutosaveName("SettingsWindow")

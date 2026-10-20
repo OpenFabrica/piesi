@@ -111,10 +111,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard taskCenter.hasRunning else { return .terminateNow }
         let alert = NSAlert()
-        alert.messageText = "有 \(taskCenter.runningCount) 个任务正在进行"
-        alert.informativeText = "现在退出会中断这些任务，已写出的文件可能不完整。"
-        alert.addButton(withTitle: "取消")
-        alert.addButton(withTitle: "中断并退出")
+        alert.messageText = String(localized: "有 \(taskCenter.runningCount) 个任务正在进行")
+        alert.informativeText = String(localized: "现在退出会中断这些任务，已写出的文件可能不完整。")
+        alert.addButton(withTitle: String(localized: "取消"))
+        alert.addButton(withTitle: String(localized: "中断并退出"))
         alert.buttons[1].hasDestructiveAction = true
         if alert.runModal() == .alertSecondButtonReturn {
             taskCenter.cancelAll()
@@ -150,8 +150,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
-        panel.message = "选择要压缩的文件或文件夹"
-        panel.prompt = "压缩"
+        panel.message = String(localized: "选择要压缩的文件或文件夹")
+        panel.prompt = String(localized: "压缩")
         Task { @MainActor in
             guard await panel.begin() == .OK else { return }
             compress(sources: panel.urls)
@@ -164,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.allowedContentTypes = ArchiveTypes.all
-        panel.message = "选择要浏览的压缩包"
+        panel.message = String(localized: "选择要浏览的压缩包")
         Task { @MainActor in
             guard await panel.begin() == .OK else { return }
             open(urls: panel.urls, browse: true)
@@ -194,7 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 archives.append(url)
             } else if ArchiveTypes.looksLikeArchive(url) {
                 Log.open.error("unreadable archive \(url.path, privacy: .public)")
-                await Alerts.error("无法打开「\(url.lastPathComponent)」", "扩展名是压缩包，但内容无法识别，文件可能已损坏或没有下载完整。", in: nil)
+                await Alerts.error(String(localized: "无法打开「\(url.lastPathComponent)」"), String(localized: "扩展名是压缩包，但内容无法识别，文件可能已损坏或没有下载完整。"), in: nil)
             } else {
                 others.append(url)
             }

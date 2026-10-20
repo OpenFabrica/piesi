@@ -10,10 +10,10 @@ enum DefaultHandler {
         guard !settings.didAskDefaultHandler else { return }
         settings.didAskDefaultHandler = true
         let alert = NSAlert()
-        alert.messageText = "把 Piesi 设为默认的解压工具？"
-        alert.informativeText = "之后双击 zip、7z、rar、tar 等压缩包会直接用 Piesi 解压。随时可以在设置里改。"
-        alert.addButton(withTitle: "设为默认")
-        alert.addButton(withTitle: "以后再说")
+        alert.messageText = String(localized: "把 Piesi 设为默认的解压工具？")
+        alert.informativeText = String(localized: "之后双击 zip、7z、rar、tar 等压缩包会直接用 Piesi 解压。随时可以在设置里改。")
+        alert.addButton(withTitle: String(localized: "设为默认"))
+        alert.addButton(withTitle: String(localized: "以后再说"))
         guard await Alerts.present(alert, in: nil) == .alertFirstButtonReturn else {
             Log.app.notice("default handler: user declined on first launch")
             return
@@ -39,14 +39,14 @@ enum DefaultHandler {
         if window != nil || !failed.isEmpty {
             let alert = NSAlert()
             if failed.isEmpty {
-                alert.messageText = "已设为默认解压工具"
-                alert.informativeText = "\(ok) 种压缩包类型现在默认用 Piesi 打开。"
+                alert.messageText = String(localized: "已设为默认解压工具")
+                alert.informativeText = String(localized: "\(ok) 种压缩包类型现在默认用 Piesi 打开。")
             } else {
                 alert.alertStyle = .warning
-                alert.messageText = "部分类型没有设置成功"
-                alert.informativeText = "成功 \(ok) 种，失败：\(failed.joined(separator: "、"))"
+                alert.messageText = String(localized: "部分类型没有设置成功")
+                alert.informativeText = String(localized: "成功 \(ok) 种，失败：\(failed.joined(separator: "、"))")
             }
-            alert.addButton(withTitle: "好")
+            alert.addButton(withTitle: String(localized: "好"))
             _ = await Alerts.present(alert, in: window)
         }
         return (ok, failed)

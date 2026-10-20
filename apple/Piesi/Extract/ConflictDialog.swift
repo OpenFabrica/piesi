@@ -7,14 +7,14 @@ enum ConflictDialog {
     /// 返回用户选的策略；取消返回 nil。
     static func ask(conflicts: [String], parent: NSWindow?) async -> Conflict? {
         let alert = NSAlert()
-        alert.messageText = "目标位置已有 \(conflicts.count) 个同名项目"
+        alert.messageText = String(localized: "目标位置已有 \(conflicts.count) 个同名项目")
         let preview = conflicts.prefix(6).joined(separator: "\n")
-        let more = conflicts.count > 6 ? "\n…还有 \(conflicts.count - 6) 个" : ""
-        alert.informativeText = "\(preview)\(more)\n\n改名会给新解出的文件加上序号，已有文件不动。"
-        alert.addButton(withTitle: "改名")
-        alert.addButton(withTitle: "覆盖")
-        alert.addButton(withTitle: "跳过")
-        alert.addButton(withTitle: "取消")
+        let more = conflicts.count > 6 ? String(localized: "\n…还有 \(conflicts.count - 6) 个") : ""
+        alert.informativeText = preview + more + "\n\n" + String(localized: "改名会给新解出的文件加上序号，已有文件不动。")
+        alert.addButton(withTitle: String(localized: "改名"))
+        alert.addButton(withTitle: String(localized: "覆盖"))
+        alert.addButton(withTitle: String(localized: "跳过"))
+        alert.addButton(withTitle: String(localized: "取消"))
         alert.buttons[1].hasDestructiveAction = true
         switch await Alerts.present(alert, in: parent) {
         case .alertFirstButtonReturn: return .rename

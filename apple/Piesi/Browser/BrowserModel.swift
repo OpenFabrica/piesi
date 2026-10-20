@@ -43,7 +43,7 @@ final class BrowserModel {
             let opened = try await CoreBridge.open(url)
             if opened.passwordState() == .forNames {
                 guard await askPassword(for: opened, name: name, parent: parent) else {
-                    errorMessage = "需要密码才能列出内容"
+                    errorMessage = String(localized: "需要密码才能列出内容")
                     return
                 }
             }
@@ -124,20 +124,20 @@ final class BrowserModel {
 
     /// 顶栏常驻的「文件名编码：GB18030（自动）」
     var encodingLabel: String {
-        guard let info = encodingInfo else { return "文件名编码" }
-        let how = info.source == "manual" ? "手动" : "自动"
-        return "文件名编码：\(info.encoding.shortName)（\(how)）"
+        guard let info = encodingInfo else { return String(localized: "文件名编码") }
+        let how = info.source == "manual" ? String(localized: "手动") : String(localized: "自动")
+        return String(localized: "文件名编码：\(info.encoding.shortName)（\(how)）")
     }
 
     /// 底栏：条目数、总大小、格式、是否加密
     var bottomBarText: String {
-        var parts = ["\(entryCount) 个条目"]
+        var parts = [String(localized: "\(entryCount) 个条目")]
         if let totalBytes {
             parts.append(ByteText.string(totalBytes))
         }
         parts.append(formatName)
         if passwordState != .notNeeded {
-            parts.append("密码保护")
+            parts.append(String(localized: "密码保护"))
         }
         return parts.joined(separator: " · ")
     }

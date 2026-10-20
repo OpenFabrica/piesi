@@ -7,7 +7,7 @@ import SwiftUI
 enum EncodingDialog {
     /// 返回 true = 用户确认（所选编码已经设到 handle 上）；false = 取消。
     static func run(handle: ArchiveHandle, archiveName: String, parent: NSWindow?) async -> Bool {
-        await DialogHost.present(title: "文件名编码", parent: parent) { finish in
+        await DialogHost.present(title: String(localized: "文件名编码"), parent: parent) { finish in
             EncodingPickerView(handle: handle, archiveName: archiveName, finish: finish)
         }
     }
@@ -36,7 +36,7 @@ struct EncodingPickerView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("「\(archiveName)」的文件名编码不确定")
                 .font(.headline)
-            Text("自动识别为 \(detected.encoding.displayName)，置信度 \(Int(detected.confidence * 100))%。选一个让右边文件名看起来正常的编码。")
+            Text("自动识别为 \(detected.encoding.displayName)，置信度 \(Int(detected.confidence * 100))%%。选一个让右边文件名看起来正常的编码。")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

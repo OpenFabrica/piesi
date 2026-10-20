@@ -15,7 +15,7 @@ final class TasksWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        panel.title = "任务"
+        panel.title = String(localized: "任务")
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
         panel.hidesOnDeactivate = false

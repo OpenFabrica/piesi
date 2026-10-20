@@ -61,7 +61,7 @@ final class CompressCoordinator {
             taskCenter.finish(item, state: .done)
             Log.create.notice("created \(options.destination.path, privacy: .public): entries=\(result.entries) in=\(result.inputBytes) out=\(result.outputBytes) junk=\(result.skippedJunk) warnings=\(result.warnings.count)")
             for warning in result.warnings {
-                Log.create.warning("create \(name, privacy: .public): \(warning, privacy: .public)")
+                Log.create.warning("create \(name, privacy: .public): \(warning.localizedText, privacy: .public)")
             }
             if settings.revealInFinder {
                 NSWorkspace.shared.activateFileViewerSelecting([options.destination])
@@ -75,7 +75,7 @@ final class CompressCoordinator {
             let message = CoreBridge.message(for: error)
             taskCenter.finish(item, state: .failed(message))
             Log.create.error("create failed \(name, privacy: .public): \(message, privacy: .public)")
-            await Alerts.error("创建「\(name)」失败", message, in: parent)
+            await Alerts.error(String(localized: "创建「\(name)」失败"), message, in: parent)
         }
     }
 }

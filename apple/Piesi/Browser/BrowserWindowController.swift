@@ -106,8 +106,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.prompt = "解压到此处"
-        panel.message = all ? "选择解压位置" : "选择解压位置（\(rows.count) 项）"
+        panel.prompt = String(localized: "解压到此处")
+        panel.message = all ? String(localized: "选择解压位置") : String(localized: "选择解压位置（\(rows.count) 项）")
         panel.directoryURL = model.url.deletingLastPathComponent()
         Task { @MainActor in
             guard await panel.beginSheetModal(for: window) == .OK, let dest = panel.url else { return }
@@ -136,7 +136,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
                     handle.setEncoding(encoding: encoding)
                 }
             } catch {
-                await Alerts.error("无法校验「\(name)」", CoreBridge.message(for: error), in: window)
+                await Alerts.error(String(localized: "无法校验「\(name)」"), CoreBridge.message(for: error), in: window)
                 return
             }
             let center = AppDelegate.shared.taskCenter
@@ -148,14 +148,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
                 center.finish(item, state: .done)
                 Log.browser.notice("verify ok \(name, privacy: .public): entries=\(result.entries) skipped=\(result.skipped) warnings=\(result.warnings.count)")
                 let alert = NSAlert()
-                alert.messageText = "校验通过：\(result.entries) 项"
+                alert.messageText = String(localized: "校验通过：\(result.entries) 项")
                 var details: [String] = []
                 if result.skipped > 0 {
-                    details.append("跳过 \(result.skipped) 项")
+                    details.append(String(localized: "跳过 \(result.skipped) 项"))
                 }
-                details.append(contentsOf: result.warnings.prefix(5))
-                alert.informativeText = details.isEmpty ? "所有条目解码和 CRC 都正常。" : details.joined(separator: "\n")
-                alert.addButton(withTitle: "好")
+                details.append(contentsOf: result.warnings.prefix(5).map(\.localizedText))
+                alert.informativeText = details.isEmpty ? String(localized: "所有条目解码和 CRC 都正常。") : details.joined(separator: "\n")
+                alert.addButton(withTitle: String(localized: "好"))
                 _ = await Alerts.present(alert, in: window)
             } catch {
                 if CoreBridge.isCancelled(error) {
@@ -165,7 +165,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
                 let message = CoreBridge.message(for: error)
                 center.finish(item, state: .failed(message))
                 Log.browser.error("verify failed \(name, privacy: .public): \(message, privacy: .public)")
-                await Alerts.error("「\(name)」校验失败", message, in: window)
+                await Alerts.error(String(localized: "「\(name)」校验失败"), message, in: window)
             }
         }
     }
@@ -212,7 +212,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
                     wrong = true
                     continue
                 }
-                await Alerts.error("无法预览「\(row.name)」", CoreBridge.message(for: error), in: window)
+                await Alerts.error(String(localized: "无法预览「\(row.name)」"), CoreBridge.message(for: error), in: window)
                 return nil
             }
         }

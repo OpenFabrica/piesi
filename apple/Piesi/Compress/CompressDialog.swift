@@ -13,19 +13,19 @@ enum CompressPreset: CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .windows: "发给 Windows"
-        case .smallest: "最小体积"
-        case .encrypted: "加密"
-        case .mac: "Mac 专用"
+        case .windows: String(localized: "发给 Windows")
+        case .smallest: String(localized: "最小体积")
+        case .encrypted: String(localized: "加密")
+        case .mac: String(localized: "Mac 专用")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .windows: "ZIP · Windows 安全文件名"
-        case .smallest: "7z · 级别 7"
-        case .encrypted: "7z · 密码 + 文件名加密"
-        case .mac: "ZIP · 保留 Finder 标签等 Mac 元数据"
+        case .windows: String(localized: "ZIP · Windows 安全文件名")
+        case .smallest: String(localized: "7z · 级别 7")
+        case .encrypted: String(localized: "7z · 密码 + 文件名加密")
+        case .mac: String(localized: "ZIP · 保留 Finder 标签等 Mac 元数据")
         }
     }
 
@@ -68,7 +68,7 @@ enum CompressPreset: CaseIterable, Identifiable {
 enum CompressDialog {
     /// 返回确认后的参数；取消返回 nil。
     static func run(sources: [URL], parent: NSWindow?) async -> CompressOptions? {
-        await DialogHost.present(title: "新建压缩包", parent: parent) { finish in
+        await DialogHost.present(title: String(localized: "新建压缩包"), parent: parent) { finish in
             CompressDialogView(sources: sources, finish: finish)
         }
     }
@@ -98,7 +98,7 @@ struct CompressDialogView: View {
         let dir = sources[0].deletingLastPathComponent()
         _directory = State(initialValue: dir)
         let name = sources.count == 1 ? sources[0].lastPathComponent : dir.lastPathComponent
-        _baseName = State(initialValue: name.isEmpty ? "压缩包" : name)
+        _baseName = State(initialValue: name.isEmpty ? String(localized: "压缩包") : name)
     }
 
     /// 当前高亮的预设：按格式 / 级别 / 安全名 / 文件名加密 / Mac 元数据反推，哪张卡片的值全对上就是哪张。
@@ -142,8 +142,8 @@ struct CompressDialogView: View {
 
     /// 顶部的来源摘要：最多列 3 个名字
     private var sourceSummary: String {
-        let names = sources.prefix(3).map(\.lastPathComponent).joined(separator: "、")
-        return sources.count > 3 ? "\(names) 等 \(sources.count) 项" : names
+        let names = sources.prefix(3).map(\.lastPathComponent).joined(separator: String(localized: "、"))
+        return sources.count > 3 ? String(localized: "\(names) 等 \(sources.count) 项") : names
     }
 
     var body: some View {
@@ -338,7 +338,7 @@ struct CompressDialogView: View {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.directoryURL = directory
-        panel.prompt = "选择"
+        panel.prompt = String(localized: "选择")
         Task { @MainActor in
             let response: NSApplication.ModalResponse
             if let window = NSApp.keyWindow {
