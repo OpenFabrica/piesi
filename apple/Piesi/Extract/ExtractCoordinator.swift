@@ -25,21 +25,22 @@ final class ExtractCoordinator {
         self.tasksWindow = tasksWindow
     }
 
-    /// 整包解压到压缩包旁边（双击路径）。返回是否成功。
+    /// 整包解压到压缩包旁边（双击路径）。成功返回解出来的根目录，失败 / 取消返回 nil。
     @discardableResult
-    func extractAll(archive url: URL, parent: NSWindow?) async -> Bool {
+    func extractAll(archive url: URL, parent: NSWindow?) async -> URL? {
         await run(archive: url, ids: [], dest: "", presets: ExtractPresets(), parent: parent)
     }
 
     /// 浏览窗口触发：指定目标目录和条目（空 = 全部），沿用窗口已定的编码 / 密码。
     @discardableResult
     func extract(archive url: URL, ids: [UInt32], dest: URL, presets: ExtractPresets, parent: NSWindow?) async -> Bool {
-        await run(archive: url, ids: ids, dest: dest.path, presets: presets, parent: parent)
+        await run(archive: url, ids: ids, dest: dest.path, presets: presets, parent: parent) != nil
     }
 
     // MARK: 流程
 
-    private func run(archive url: URL, ids: [UInt32], dest: String, presets: ExtractPresets, parent: NSWindow?) async -> Bool {
+    /// 成功返回实际落盘的根目录。
+    private func run(archive url: URL, ids: [UInt32], dest: String, presets: ExtractPresets, parent: NSWindow?) async -> URL? {
         let name = url.lastPathComponent
 
         // 1. 打开
@@ -49,7 +50,7 @@ final class ExtractCoordinator {
         } catch {
             Log.extract.error("open failed \(url.path, privacy: .public): \(CoreBridge.message(for: error), privacy: .public)")
             await Alerts.error(String(localized: "无法打开「\(name)」"), CoreBridge.message(for: error), in: parent)
-            return false
+            return nil
         }
 
         // 2. 密码：浏览窗口传了就直接用；否则按需要弹框，错了重试，取消就退出
@@ -59,10 +60,10 @@ final class ExtractCoordinator {
                 try await CoreBridge.setPassword(handle, password)
             } catch {
                 await Alerts.error(String(localized: "无法打开「\(name)」"), CoreBridge.message(for: error), in: parent)
-                return false
+                return nil
             }
         } else if handle.passwordState() != .notNeeded {
-            guard let entered = await askPassword(handle, name: name, parent: parent, wrongBefore: false) else { return false }
+            guard let entered = await askPassword(handle, name: name, parent: parent, wrongBefore: false) else { return nil }
             password = entered
         }
 
@@ -73,7 +74,7 @@ final class ExtractCoordinator {
             let info = handle.encodingInfo()
             if info.ambiguous || info.confidence < encodingConfidenceThreshold {
                 Log.extract.notice("encoding uncertain \(name, privacy: .public): \(info.encoding.shortName, privacy: .public) \(info.confidence) ambiguous=\(info.ambiguous)")
-                guard await EncodingDialog.run(handle: handle, archiveName: name, parent: parent) else { return false }
+                guard await EncodingDialog.run(handle: handle, archiveName: name, parent: parent) else { return nil }
             }
         }
 
@@ -84,7 +85,7 @@ final class ExtractCoordinator {
             plan = try await CoreBridge.plan(handle, request)
         } catch {
             await Alerts.error(String(localized: "无法解压「\(name)」"), CoreBridge.message(for: error), in: parent)
-            return false
+            return nil
         }
         for warning in plan.warnings {
             Log.extract.warning("plan \(name, privacy: .public): \(warning.localizedText, privacy: .public)")
@@ -92,7 +93,7 @@ final class ExtractCoordinator {
 
         // 5. 冲突：目标里已有同名项目，问策略（默认改名）
         if !plan.conflicts.isEmpty {
-            guard let policy = await ConflictDialog.ask(conflicts: plan.conflicts, parent: parent) else { return false }
+            guard let policy = await ConflictDialog.ask(conflicts: plan.conflicts, parent: parent) else { return nil }
             request.conflict = policy
         }
 
@@ -112,7 +113,7 @@ final class ExtractCoordinator {
                     in: parent
                 )
             }
-            return false
+            return nil
         }
 
         // 7. 解压。forData 的密码只有真正解数据时才验得出来，错了就重新要密码再来一次
@@ -129,23 +130,23 @@ final class ExtractCoordinator {
                     Log.extract.warning("extract \(name, privacy: .public): \(warning.localizedText, privacy: .public)")
                 }
                 finish(result: result, archive: url, wholeArchive: ids.isEmpty)
-                return true
+                return URL(fileURLWithPath: result.root)
             } catch {
                 if CoreBridge.isCancelled(error) {
                     taskCenter.finish(item, state: .cancelled)
                     Log.extract.notice("cancelled \(name, privacy: .public)")
-                    return false
+                    return nil
                 }
                 if CoreBridge.isWrongPassword(error), presets.password == nil {
                     taskCenter.remove(item)
-                    guard await askPassword(handle, name: name, parent: parent, wrongBefore: true) != nil else { return false }
+                    guard await askPassword(handle, name: name, parent: parent, wrongBefore: true) != nil else { return nil }
                     continue
                 }
                 let message = CoreBridge.message(for: error)
                 taskCenter.finish(item, state: .failed(message))
                 Log.extract.error("failed \(name, privacy: .public): \(message, privacy: .public)")
                 await Alerts.error(String(localized: "解压「\(name)」失败"), message, in: parent)
-                return false
+                return nil
             }
         }
     }
@@ -154,7 +155,7 @@ final class ExtractCoordinator {
     private func askPassword(_ handle: ArchiveHandle, name: String, parent: NSWindow?, wrongBefore: Bool) async -> String? {
         var wrong = wrongBefore
         while true {
-            guard let password = await PasswordDialog.ask(archiveName: name, wrongBefore: wrong, parent: parent) else { return nil }
+            guard let password = await PasswordDialog.ask(archiveName: name, wrongBefore: wrong, weakEncryption: handle.hasWeakEncryption(), parent: parent) else { return nil }
             do {
                 try await CoreBridge.setPassword(handle, password)
                 return password

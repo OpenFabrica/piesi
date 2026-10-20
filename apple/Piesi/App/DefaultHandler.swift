@@ -9,6 +9,7 @@ enum DefaultHandler {
     static func askOnFirstLaunch(settings: AppSettings) async {
         guard !settings.didAskDefaultHandler else { return }
         settings.didAskDefaultHandler = true
+        Log.app.notice("default handler: asking on first launch")
         let alert = NSAlert()
         alert.messageText = String(localized: "把 Piesi 设为默认的解压工具？")
         alert.informativeText = String(localized: "之后双击 zip、7z、rar、tar 等压缩包会直接用 Piesi 解压。随时可以在设置里改。")

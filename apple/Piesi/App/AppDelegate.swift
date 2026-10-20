@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 是否因为打开文件而启动：这种情况下不弹主窗口，做完自动退出（设计 6.3）
     private var launchedForFiles = false
     private var finishedLaunching = false
+    /// 无参数启动时延后显示主窗口的任务（见 showMainWindowAfterLaunch）
+    private var pendingMainWindow: Task<Void, Never>?
+    /// 正在跑的 App Intents 数量：perform() 没返回前不能退出，否则快捷指令收不到结果
+    private var headlessWorkCount = 0
     private var mainWindowController: MainWindowController?
     /// Finder 右键「服务」的处理器；NSApp.servicesProvider 是强引用，这里留一份便于测试
     private let servicesProvider = ServicesProvider()
@@ -44,17 +48,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { _ in
             Task { @MainActor in AppDelegate.shared?.maybeAutoQuit() }
         }
-        if !launchedForFiles {
-            showMainWindow()
+        // 测试入口 -PiesiCompress 等同于「因文件启动」：不开主窗口，做完按自动退出规则退出
+        if settings.hasCompressTestFlag {
+            launchedForFiles = true
+        } else if launchedForFiles {
+            NSApp.activate()
+        } else {
+            showMainWindowAfterLaunch()
         }
         if settings.showSettingsAtLaunch {
             settingsWindow.show()
         }
-        NSApp.activate()
         // 首次启动只问「设为默认解压工具」这一件事（设计 6.3），问完再处理排队的文件
         Task { @MainActor in
             await DefaultHandler.askOnFirstLaunch(settings: settings)
             openQueue.start()
+            if settings.hasCompressTestFlag {
+                await runCompressTestEntry()
+            }
+        }
+    }
+
+    /// 无参数启动时的主窗口延后 300 ms 再显示：快捷指令（App Intents）在后台拉起 app 时，perform() 要等启动完成才到，
+    /// 没有这一拍延迟主窗口会先闪出来再被撤掉。普通点 Dock 启动多等 300 ms 感觉不到。
+    private func showMainWindowAfterLaunch() {
+        pendingMainWindow = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let self else { return }
+            showMainWindow()
+        }
+    }
+
+    /// App Intents 开始干活：撤掉还没显示的主窗口，并按「因文件启动」的规则在做完后自动退出（有别的窗口开着就不退）。
+    func beginHeadlessWork() {
+        pendingMainWindow?.cancel()
+        pendingMainWindow = nil
+        launchedForFiles = true
+        headlessWorkCount += 1
+    }
+
+    /// 意图做完：默认等 2 秒让结果经 XPC 交回快捷指令，再按自动退出规则判断（测试入口传 .zero 立刻判断）。
+    func endHeadlessWork(quitAfter delay: Duration = .seconds(2)) {
+        headlessWorkCount -= 1
+        Task { @MainActor [weak self] in
+            if delay > .zero {
+                try? await Task.sleep(for: delay)
+            }
+            self?.maybeAutoQuit()
+        }
+    }
+
+    /// 隐藏启动参数 -PiesiCompress（测试入口，和 -PiesiBrowse 一样在 AppSettings 解析）：
+    /// 不弹对话框，走和对话框相同的 CompressCoordinator.run()，结果看统一日志，然后按自动退出规则退出。
+    private func runCompressTestEntry() async {
+        // 和意图一样计数：不然 taskCenter.finish 一触发 maybeAutoQuit，进程会在 run() 返回前退出，收尾（日志、Finder 显示）做不完
+        beginHeadlessWork()
+        defer { endHeadlessWork(quitAfter: .zero) }
+        if let request = settings.compressTestRequest {
+            let options = request.preset.options(destination: request.destination, sources: request.sources, password: request.password)
+            await compressor.runHeadless(options)
+        } else {
+            Log.app.error("compress test entry: 用法 -PiesiCompress <windows|smallest|encrypted|mac> <输出路径> <源路径…> [-PiesiPassword <密码>]")
         }
     }
 
@@ -225,7 +279,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 因打开文件而启动、队列空、没有任务在跑、没有别的窗口 → 退出（设置项可关）。
     /// 任务浮窗和各种对话框都是 NSPanel，不算「别的窗口」。
     func maybeAutoQuit() {
-        guard launchedForFiles, finishedLaunching, settings.autoQuit else { return }
+        guard launchedForFiles, finishedLaunching, settings.autoQuit, headlessWorkCount == 0 else { return }
         guard openQueue.isIdle, !taskCenter.hasRunning else { return }
         let userWindows = NSApp.windows.filter { $0.isVisible && !($0 is NSPanel) }
         guard userWindows.isEmpty else { return }

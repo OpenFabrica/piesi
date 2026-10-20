@@ -1737,6 +1737,34 @@
         }
       }
     },
+    "压缩预设": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compression Preset"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "圧縮プリセット"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩预设"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "壓縮預設"
+          }
+        }
+      }
+    },
     "双击压缩包": {
       "localizations": {
         "en": {
@@ -2409,6 +2437,34 @@
         }
       }
     },
+    "快捷指令没有给出「%@」的文件路径": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcuts didn’t provide a file path for “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットから「%@」のファイルパスが渡されませんでした"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷指令没有给出「%@」的文件路径"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "捷徑沒有給出「%@」的檔案路徑"
+          }
+        }
+      }
+    },
     "成功 %lld 种，失败：%@": {
       "localizations": {
         "en": {
@@ -2601,6 +2657,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "把壓縮檔或檔案拖到這裡"
+          }
+        }
+      }
+    },
+    "把压缩包解压到它旁边，和双击一样。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extracts each archive next to itself, just like double-clicking it."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダブルクリックと同じように、アーカイブをその隣に展開します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把压缩包解压到它旁边，和双击一样。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把壓縮檔解壓縮到它旁邊，和連按兩下一樣。"
+          }
+        }
+      }
+    },
+    "把文件按预设打成一个压缩包，放在第一个文件旁边。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Packs the files into one archive using a preset, next to the first file."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プリセットに従ってファイルを 1 つのアーカイブにまとめ、最初のファイルの隣に保存します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把文件按预设打成一个压缩包，放在第一个文件旁边。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把檔案按預設打成一個壓縮檔，放在第一個檔案旁邊。"
           }
         }
       }
@@ -3497,6 +3609,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "現在結束會中斷這些工作，已寫出的檔案可能不完整。"
+          }
+        }
+      }
+    },
+    "用 Piesi 压缩": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compress with Piesi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Piesi で圧縮"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Piesi 压缩"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Piesi 壓縮"
+          }
+        }
+      }
+    },
+    "用 Piesi 解压": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extract with Piesi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Piesi で展開"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Piesi 解压"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Piesi 解壓縮"
           }
         }
       }
@@ -4677,6 +4845,34 @@
         }
       }
     },
+    "这个包用的是老式 ZipCrypto 加密，已知可被破解。能解开，但建议用 AES 重新打包。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This archive uses legacy ZipCrypto encryption, which is known to be breakable. It can still be opened, but consider re-packing it with AES."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアーカイブは旧式の ZipCrypto 暗号化を使っており、解読可能であることが知られています。開くことはできますが、AES で圧縮し直すことをおすすめします。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个包用的是老式 ZipCrypto 加密，已知可被破解。能解开，但建议用 AES 重新打包。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個壓縮檔用的是老式 ZipCrypto 加密，已知可被破解。能解開，但建議用 AES 重新打包。"
+          }
+        }
+      }
+    },
     "这个压缩包已加密，输入密码后继续。": {
       "localizations": {
         "en": {
@@ -5121,6 +5317,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "預覽"
+          }
+        }
+      }
+    },
+    "预设": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preset"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プリセット"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预设"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預設"
           }
         }
       }

@@ -4,6 +4,7 @@
 规则（docs/design.md 5.5）：
 - 代码里的文案字面量是简体原文，同时就是 String Catalog 的键。
 - SwiftUI 的 Text / Button / Toggle 等拿字面量时自动当键；AppKit 侧（NSMenu、NSAlert、stringValue…）必须包 String(localized:)。
+- App Intents 的 title / IntentDescription / @Parameter(title:) / DisplayRepresentation 本身就是 LocalizedStringResource，也算已本地化。
 - 插值 \\(x) 在键里是 %@ / %lld / %llu，脚本按通配匹配。
 
 用法：python3 apple/scripts/strings-lint.py   （退出码 1 = 有问题）
@@ -46,7 +47,9 @@ def literals(code: str):
         yield start, "".join(buf)
         i += 1
 # 这些调用把字面量当 LocalizedStringKey，不用再包
-SWIFTUI_AUTO = re.compile(r"(?:\b(?:Text|Button|Toggle|Section|Picker|Label|TextField|SecureField|DisclosureGroup|ProgressView|ContentUnavailableView|Menu|Link|NavigationLink)\s*\(|\.(?:help|navigationTitle|confirmationDialog|alert)\s*\()\s*$")
+SWIFTUI_AUTO = re.compile(r"(?:\b(?:Text|Button|Toggle|Section|Picker|Label|TextField|SecureField|DisclosureGroup|ProgressView|ContentUnavailableView|Menu|Link|NavigationLink)\s*\(|\.(?:help|navigationTitle|confirmationDialog|alert)\s*\(|LocalizedStringResource\s*=|LocalizedStringResource\s*\(|IntentDescription\s*\(|@Parameter\(title:|TypeDisplayRepresentation\(name:|DisplayRepresentation\(title:|shortTitle:)\s*$")
+# 行尾注释写 `strings-lint: ignore` 的行不查（AppShortcuts 短语在 AppShortcuts.xcstrings 里本地化）
+IGNORE_MARK = "strings-lint: ignore"
 WRAPPED = re.compile(r"String\(localized:\s*$")
 # 不是给用户看的
 IGNORE = re.compile(r"fatalError\(|Logger\(|logger\.|Log\.\w+\.|privacy:")
@@ -72,6 +75,8 @@ def scan(target: str, src_dir: pathlib.Path):
     used, problems = set(), []
     for path in sorted(src_dir.rglob("*.swift")):
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if IGNORE_MARK in line:
+                continue
             code = line.split("//", 1)[0]
             if IGNORE.search(code):
                 continue

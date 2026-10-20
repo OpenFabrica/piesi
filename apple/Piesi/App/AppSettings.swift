@@ -17,12 +17,24 @@ enum SettingsKey {
     static let forceBrowse = "PiesiBrowse"
     /// 隐藏启动参数 `-PiesiShowSettings YES`：启动就开设置窗口，自动化测试用
     static let showSettings = "PiesiShowSettings"
+    /// 隐藏启动参数 `-PiesiCompress <预设> <输出路径> <源路径…>`：测试入口，不弹对话框直接压缩（见 compressTestRequest）
+    static let compressTest = "PiesiCompress"
+    /// 隐藏启动参数 `-PiesiPassword <密码>`：配合 -PiesiCompress 给「加密」预设传密码
+    static let compressPassword = "PiesiPassword"
 }
 
 /// 双击压缩包的默认动作。
 enum DefaultAction: String {
     case extract
     case browse
+}
+
+/// `-PiesiCompress` 解析出来的压缩请求。
+struct CompressTestRequest: Sendable {
+    let preset: CompressPreset
+    let destination: URL
+    let sources: [URL]
+    let password: String?
 }
 
 /// 设置的薄封装：只读访问走这里，写入由设置页的 @AppStorage 完成。
@@ -51,4 +63,27 @@ final class AppSettings {
     /// 命令行 `-PiesiBrowse YES` 会进 NSArgumentDomain，这里直接读得到
     var forceBrowse: Bool { defaults.bool(forKey: SettingsKey.forceBrowse) }
     var showSettingsAtLaunch: Bool { defaults.bool(forKey: SettingsKey.showSettings) }
+
+    /// 命令行里有没有 `-PiesiCompress`（有但格式不对时 AppDelegate 会在日志里报用法）
+    var hasCompressTestFlag: Bool { ProcessInfo.processInfo.arguments.contains("-" + SettingsKey.compressTest) }
+
+    /// 测试入口 `-PiesiCompress <预设> <输出路径> <源路径…>`，预设名 windows / smallest / encrypted / mac，
+    /// 密码用 `-PiesiPassword <密码>`。多值参数 UserDefaults 读不了，这里自己扫 argv：取到下一个 `-` 开头的参数或结尾为止，
+    /// 所以别的参数（-didAskDefaultHandler 等）要放在它前面。
+    var compressTestRequest: CompressTestRequest? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-" + SettingsKey.compressTest) else { return nil }
+        let values = Array(arguments[(flag + 1)...].prefix { !$0.hasPrefix("-") })
+        guard values.count >= 3, let preset = CompressPreset(rawValue: values[0]) else { return nil }
+        var password: String?
+        if let index = arguments.firstIndex(of: "-" + SettingsKey.compressPassword), index + 1 < arguments.count {
+            password = arguments[index + 1]
+        }
+        return CompressTestRequest(
+            preset: preset,
+            destination: URL(fileURLWithPath: values[1]),
+            sources: values[2...].map { URL(fileURLWithPath: $0) },
+            password: password
+        )
+    }
 }

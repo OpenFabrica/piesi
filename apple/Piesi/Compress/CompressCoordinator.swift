@@ -36,11 +36,18 @@ final class CompressCoordinator {
             Log.create.notice("compress cancelled in dialog")
             return
         }
-        await run(options, parent: parent)
+        _ = await run(options, parent: parent)
     }
 
-    /// 后台创建；失败或取消时 Rust 会删掉写了一半的输出。
-    private func run(_ options: CompressOptions, parent: NSWindow?) async {
+    /// 无界面入口（-PiesiCompress 测试参数、App Intents）：不弹对话框，按给定参数直接压。成功返回输出路径。
+    @discardableResult
+    func runHeadless(_ options: CompressOptions) async -> URL? {
+        Log.create.notice("headless compress \(options.destination.path, privacy: .public) sources=\(options.sources.count)")
+        return await run(options, parent: nil) ? options.destination : nil
+    }
+
+    /// 后台创建；失败或取消时 Rust 会删掉写了一半的输出。返回是否成功。
+    private func run(_ options: CompressOptions, parent: NSWindow?) async -> Bool {
         let name = options.destination.lastPathComponent
         let request = CreateRequest(
             dest: options.destination.path,
@@ -66,16 +73,18 @@ final class CompressCoordinator {
             if settings.revealInFinder {
                 NSWorkspace.shared.activateFileViewerSelecting([options.destination])
             }
+            return true
         } catch {
             if CoreBridge.isCancelled(error) {
                 taskCenter.finish(item, state: .cancelled)
                 Log.create.notice("create cancelled \(name, privacy: .public)")
-                return
+                return false
             }
             let message = CoreBridge.message(for: error)
             taskCenter.finish(item, state: .failed(message))
             Log.create.error("create failed \(name, privacy: .public): \(message, privacy: .public)")
             await Alerts.error(String(localized: "创建「\(name)」失败"), message, in: parent)
+            return false
         }
     }
 }

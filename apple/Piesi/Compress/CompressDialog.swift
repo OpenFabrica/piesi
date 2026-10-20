@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 
 /// 预设卡片。选中即套一组默认值，之后还能在「高级」里改。
-enum CompressPreset: CaseIterable, Identifiable {
+enum CompressPreset: String, CaseIterable, Identifiable, Sendable {
     case windows
     case smallest
     case encrypted
@@ -61,6 +61,22 @@ enum CompressPreset: CaseIterable, Identifiable {
     var macMetadata: Bool {
         self == .mac
     }
+
+    /// 这张卡片在「高级」里什么都不改直接点「压缩」会得到的参数（skipJunk 默认开）；-PiesiCompress 入口和 App Intents 用。
+    /// 文件名加密和 submit() 一样只在 7z + 有密码时为真。
+    func options(destination: URL, sources: [URL], password: String?) -> CompressOptions {
+        CompressOptions(
+            destination: destination,
+            sources: sources,
+            format: format,
+            level: UInt8(level),
+            password: password,
+            encryptNames: encryptNames && format == .sevenZ && password != nil,
+            skipJunk: true,
+            windowsSafe: windowsSafe,
+            macMetadata: macMetadata
+        )
+    }
 }
 
 /// 对话框入口。
@@ -95,10 +111,8 @@ struct CompressDialogView: View {
     init(sources: [URL], finish: @escaping @MainActor (CompressOptions?) -> Void) {
         self.sources = sources
         self.finish = finish
-        let dir = sources[0].deletingLastPathComponent()
-        _directory = State(initialValue: dir)
-        let name = sources.count == 1 ? sources[0].lastPathComponent : dir.lastPathComponent
-        _baseName = State(initialValue: name.isEmpty ? String(localized: "压缩包") : name)
+        _directory = State(initialValue: sources[0].deletingLastPathComponent())
+        _baseName = State(initialValue: ArchiveNaming.defaultBaseName(for: sources))
     }
 
     /// 当前高亮的预设：按格式 / 级别 / 安全名 / 文件名加密 / Mac 元数据反推，哪张卡片的值全对上就是哪张。
@@ -117,15 +131,7 @@ struct CompressDialogView: View {
 
     /// 已存在就加「 2」「 3」…
     private var destination: URL {
-        let fm = FileManager.default
-        let ext = formatExtension(format: format)
-        var candidate = directory.appendingPathComponent(fileName)
-        var index = 2
-        while fm.fileExists(atPath: candidate.path) {
-            candidate = directory.appendingPathComponent("\(baseName) \(index).\(ext)")
-            index += 1
-        }
-        return candidate
+        ArchiveNaming.freeDestination(directory: directory, baseName: baseName, format: format)
     }
 
     /// 两次密码不一致（只在填了密码时算）
@@ -369,5 +375,27 @@ struct CompressDialogView: View {
             macMetadata: macMetadata && format == .zip
         )
         finish(options)
+    }
+}
+
+/// 输出文件的默认命名，对话框和无界面入口（-PiesiCompress、App Intents）共用。
+enum ArchiveNaming {
+    /// 默认基础名：单个源 → 源名；多个 → 它们所在目录名；都拿不到就叫「压缩包」。
+    static func defaultBaseName(for sources: [URL]) -> String {
+        let name = sources.count == 1 ? sources[0].lastPathComponent : sources[0].deletingLastPathComponent().lastPathComponent
+        return name.isEmpty ? String(localized: "压缩包") : name
+    }
+
+    /// directory/baseName.ext；已存在就加「 2」「 3」…
+    static func freeDestination(directory: URL, baseName: String, format: CreateFormat) -> URL {
+        let fm = FileManager.default
+        let ext = formatExtension(format: format)
+        var candidate = directory.appendingPathComponent("\(baseName).\(ext)")
+        var index = 2
+        while fm.fileExists(atPath: candidate.path) {
+            candidate = directory.appendingPathComponent("\(baseName) \(index).\(ext)")
+            index += 1
+        }
+        return candidate
     }
 }

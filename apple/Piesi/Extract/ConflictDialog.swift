@@ -6,6 +6,7 @@ import AppKit
 enum ConflictDialog {
     /// 返回用户选的策略；取消返回 nil。
     static func ask(conflicts: [String], parent: NSWindow?) async -> Conflict? {
+        Log.extract.notice("conflict dialog: \(conflicts.count) items")
         let alert = NSAlert()
         alert.messageText = String(localized: "目标位置已有 \(conflicts.count) 个同名项目")
         let preview = conflicts.prefix(6).joined(separator: "\n")

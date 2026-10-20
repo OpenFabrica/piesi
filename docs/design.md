@@ -194,6 +194,8 @@
 - Quick Look 扩展：空格预览包内文件列表；appex 永远沙盒且内存受限，**只做索引不解压**，列表最多 1 万行；头加密的 7z 无法预览（不能要密码）。
 - 不用 FinderSync（为同步盘设计，不合适）。
 
+- App Intents（已实现，2026-10-20）：「用 Piesi 解压」「用 Piesi 压缩」两个意图（`apple/Piesi/Intents/Intents.swift`），走和双击 / 对话框相同的协调器；`openAppWhenRun = false`，后台拉起不抢前台，perform() 返回 2 秒后按自动退出规则退出。无参数启动的主窗口延后 300 ms 显示，避免被意图拉起时闪一下。Siri 短语在 `AppShortcuts.xcstrings`。
+
 ### 6.5 分发
 - 最低 macOS 14（SDK 26 编译，在 26 上自动用 Liquid Glass 外观）。
 - Developer ID 签名 + 公证 + staple，按 `~/.claude/docs/apple-signing.md`（profile `aster-notary`）。
@@ -275,6 +277,8 @@ Piesi/
 - **性能**：和 `7zz`、Keka 对比同一数据集，`/usr/bin/time -l` 记录耗时与峰值内存；10 万条目包打开 < 200 ms，列表滚动不掉帧。
 - **端到端**：Finder 右键用 Piesi 压缩 → 拷到 Windows 11 资源管理器解压，文件名正确、没有 `__MACOSX`；WinRAR 生成的 GBK zip → Piesi 打开名字正确；`spctl -a -vv -t exec` 显示 Notarized Developer ID。
 - **UI**：按 ui-loop 流程截图比对。
+
+- **无界面压缩入口**（测试用）：`Piesi.app/Contents/MacOS/Piesi -didAskDefaultHandler YES -PiesiCompress <windows|smallest|encrypted|mac> <输出路径> <源路径…> [-PiesiPassword <密码>]`，不弹对话框直接走 CompressCoordinator，结果看统一日志（subsystem `com.citrolabs.piesi`）；四个预设的产物用 7zz / Python zipfile 核对。
 
 ## 11. 已定事项与评审分歧
 

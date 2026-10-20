@@ -87,7 +87,7 @@ final class BrowserModel {
     private func askPassword(for handle: ArchiveHandle, name: String, parent: NSWindow?, wrongBefore: Bool = false) async -> Bool {
         var wrong = wrongBefore
         while true {
-            guard let entered = await PasswordDialog.ask(archiveName: name, wrongBefore: wrong, parent: parent) else { return false }
+            guard let entered = await PasswordDialog.ask(archiveName: name, wrongBefore: wrong, weakEncryption: handle.hasWeakEncryption(), parent: parent) else { return false }
             do {
                 try await CoreBridge.setPassword(handle, entered)
                 password = entered
