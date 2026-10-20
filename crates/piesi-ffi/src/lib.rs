@@ -508,12 +508,16 @@ pub struct ExtractRequest {
     pub skip_junk: bool,
     /// 空 = 全部
     pub ids: Vec<u32>,
+    /// 顶层文件夹已存在时：true = 解进已有文件夹，false = 另建 `名字-2`（见 ExtractPlanInfo.existing_folder）
+    pub merge_into_existing: bool,
 }
 
 /// 解压结果。
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ExtractResult {
     pub root: String,
+    /// 解出来的顶层项目的完整路径，完成后在 Finder 里选中
+    pub top_level: Vec<String>,
     pub extracted: u64,
     pub skipped: u64,
     pub skipped_junk: u64,
@@ -535,6 +539,10 @@ pub struct ExtractPlanInfo {
     pub conflicts: Vec<String>,
     pub warnings: Vec<Warning>,
     pub skipped_junk: u64,
+    /// 顶层文件夹在目标里已存在时，那个文件夹的名字；UI 据此问「另建还是解进去」
+    pub existing_folder: Option<String>,
+    /// 不合并时会用的新文件夹名（`名字-2`…）
+    pub new_folder: Option<String>,
 }
 
 /// 校验结果。
@@ -804,6 +812,7 @@ impl ArchiveHandle {
         let outcome = a.extract(selected, &opts, &ctx)?;
         Ok(ExtractResult {
             root: outcome.root.to_string_lossy().into_owned(),
+            top_level: outcome.top_level.iter().map(|p| p.to_string_lossy().into_owned()).collect(),
             extracted: outcome.report.extracted,
             skipped: outcome.report.skipped,
             skipped_junk: outcome.skipped_junk,
@@ -826,6 +835,8 @@ impl ArchiveHandle {
             conflicts: plan.conflicts,
             warnings: convert_warnings(plan.warnings),
             skipped_junk: plan.skipped_junk,
+            existing_folder: plan.existing_folder,
+            new_folder: plan.new_folder,
         })
     }
 
@@ -863,6 +874,7 @@ fn extract_options(archive: &Path, request: &ExtractRequest) -> ExtractOptions {
     }
     opts.smart_folder = request.smart_folder;
     opts.skip_junk = request.skip_junk;
+    opts.merge_into_existing = request.merge_into_existing;
     opts.conflict = match request.conflict {
         Conflict::Overwrite => ConflictPolicy::Overwrite,
         Conflict::Skip => ConflictPolicy::Skip,
