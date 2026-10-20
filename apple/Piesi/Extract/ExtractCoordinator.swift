@@ -79,13 +79,21 @@ final class ExtractCoordinator {
         }
 
         // 4. 计划（不落盘）：智能文件夹只在整包解压时有意义
-        var request = ExtractRequest(dest: dest, smartFolder: ids.isEmpty, conflict: .rename, skipJunk: true, ids: ids)
-        let plan: ExtractPlanInfo
-        do {
-            plan = try await CoreBridge.plan(handle, request)
-        } catch {
-            await Alerts.error(String(localized: "无法解压「\(name)」"), CoreBridge.message(for: error), in: parent)
-            return nil
+        var request = ExtractRequest(dest: dest, smartFolder: ids.isEmpty, conflict: .rename, skipJunk: true, ids: ids, mergeIntoExisting: false)
+        guard var plan = await makePlan(handle, request, name: name, parent: parent) else { return nil }
+
+        // 4b. 顶层文件夹已存在：问另建「名字-2」还是解进已有的文件夹；选解进去就按合并重算计划（冲突在下一步再问）
+        if let existing = plan.existingFolder, let newFolder = plan.newFolder {
+            switch await ExistingFolderDialog.ask(existing: existing, newFolder: newFolder, parent: parent) {
+            case .newFolder:
+                break
+            case .merge:
+                request.mergeIntoExisting = true
+                guard let merged = await makePlan(handle, request, name: name, parent: parent) else { return nil }
+                plan = merged
+            case nil:
+                return nil
+            }
         }
         for warning in plan.warnings {
             Log.extract.warning("plan \(name, privacy: .public): \(warning.localizedText, privacy: .public)")
@@ -151,6 +159,16 @@ final class ExtractCoordinator {
         }
     }
 
+    /// 算解压计划；失败时弹错误并返回 nil。
+    private func makePlan(_ handle: ArchiveHandle, _ request: ExtractRequest, name: String, parent: NSWindow?) async -> ExtractPlanInfo? {
+        do {
+            return try await CoreBridge.plan(handle, request)
+        } catch {
+            await Alerts.error(String(localized: "无法解压「\(name)」"), CoreBridge.message(for: error), in: parent)
+            return nil
+        }
+    }
+
     /// 反复要密码直到 setPassword 通过或用户取消。返回通过的密码。
     private func askPassword(_ handle: ArchiveHandle, name: String, parent: NSWindow?, wrongBefore: Bool) async -> String? {
         var wrong = wrongBefore
@@ -170,10 +188,11 @@ final class ExtractCoordinator {
         }
     }
 
-    /// 收尾：按设置在 Finder 显示、把压缩包移到废纸篓（只在整包解压时）。
+    /// 收尾：按设置在 Finder 里选中解出来的顶层项目（没有就退回根目录）、把压缩包移到废纸篓（只在整包解压时）。
     private func finish(result: ExtractResult, archive: URL, wholeArchive: Bool) {
         if settings.revealInFinder {
-            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: result.root)])
+            let paths = result.topLevel.isEmpty ? [result.root] : result.topLevel
+            NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) })
         }
         if settings.moveToTrash, wholeArchive {
             do {

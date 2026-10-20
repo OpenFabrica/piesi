@@ -1,4 +1,4 @@
-// AppDelegate.swift —— AppKit 委托：启动流程、Finder 打开事件、主窗口、自动退出。
+// AppDelegate.swift —— AppKit 委托：启动流程、Finder 打开事件与右键菜单请求、主窗口、自动退出。
 import AppKit
 import UniformTypeIdentifiers
 
@@ -113,16 +113,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Finder 双击 / 拖到 Dock / open 命令。⌥ 双击 = 浏览（设计 6.3）；open 事件不带按键，读当前硬件修饰键。
+    /// piesi:// 链接来自 Finder 右键菜单扩展，单独处理。
     func application(_ application: NSApplication, open urls: [URL]) {
+        // 无效链接（伪造、过期）不算「因文件启动」：否则 app 会不开窗口、也没事可做，停在后台不退出
+        let accepted = urls.filter { !$0.isFileURL }.filter(openFinderRequest)
+        let urls = urls.filter(\.isFileURL)
+        if !accepted.isEmpty || !urls.isEmpty {
+            markLaunchedForFilesIfStarting()
+        }
+        guard !urls.isEmpty else { return }
         let option = NSEvent.modifierFlags.contains(.option)
         let browse = option || settings.forceBrowse || settings.defaultAction == .browse
-        if !finishedLaunching {
-            launchedForFiles = true
-        }
         for url in urls {
             Log.open.notice("open \(url.path, privacy: .public) option=\(option) browse=\(browse)")
         }
         openQueue.enqueue(OpenRequest(urls: urls, browse: browse))
+    }
+
+    /// 打开请求到达时，判断这次启动算不算「因文件启动」（不弹主窗口、做完自动退出）。
+    /// 文件的 open 事件一定早于 didFinishLaunching；piesi:// 链接的事件实测可能晚到一点，
+    /// 这时主窗口还在 300 ms 延迟里没显示，同样撤掉它，按因文件启动处理（和 beginHeadlessWork 一个道理）。
+    private func markLaunchedForFilesIfStarting() {
+        if !finishedLaunching {
+            launchedForFiles = true
+        } else if mainWindowController == nil, let pending = pendingMainWindow, !pending.isCancelled {
+            pending.cancel()
+            pendingMainWindow = nil
+            launchedForFiles = true
+            // 和 didFinishLaunching 里「因文件启动」的分支一致：没有主窗口也要到前台，后面的对话框才不会藏在别的窗口后面
+            NSApp.activate()
+        }
+    }
+
+    /// Finder 右键菜单扩展发来的 piesi://finder?id=… ：按 id 取出请求，和双击一样排进打开队列（不看 ⌥ 和默认动作设置）。
+    /// 返回是否收下了请求。
+    private func openFinderRequest(_ link: URL) -> Bool {
+        guard let request = FinderHandoff.take(link) else {
+            Log.open.error("ignored link \(link.absoluteString, privacy: .public)")
+            return false
+        }
+        let urls = request.paths.map { URL(fileURLWithPath: $0) }
+        Log.open.notice("finder \(request.action.rawValue, privacy: .public): \(urls.count) files")
+        switch request.action {
+        case .extract:
+            openQueue.enqueue(OpenRequest(urls: urls, browse: false))
+        case .browse:
+            openQueue.enqueue(OpenRequest(urls: urls, browse: true))
+        case .compress:
+            openQueue.enqueue(OpenRequest(urls: urls, browse: false, compressAll: true))
+        }
+        return true
     }
 
     /// 点 Dock 图标而没有窗口时，重新显示主窗口。
@@ -230,6 +270,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         tasksWindow.show()
     }
 
+    /// 「关于 Piesi」：系统标准关于面板，版本一行显示 app 版本（带开发后缀）和 Rust 核心版本，
+    /// 如「版本 0.1.0-dev (core 0.1.0-dev)」；下面放 GitHub 仓库、作者 X 账号，请用户点个 Star。主窗口不再放版本号。
+    @objc func showAbout(_ sender: Any?) {
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationVersion: AppInfo.version,
+            .version: "core \(CoreBridge.version)",
+            .credits: aboutCredits(),
+        ])
+        NSApp.activate()
+    }
+
+    /// 关于面板的附加文字：一句求 Star，加两条可点的链接（GitHub 仓库、X 账号），居中小字。
+    private func aboutCredits() -> NSAttributedString {
+        let center = NSMutableParagraphStyle()
+        center.alignment = .center
+        center.paragraphSpacing = 4
+        let base: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: center,
+        ]
+        let text = NSMutableAttributedString(string: String(localized: "喜欢 Piesi？去 GitHub 给它点个 Star ⭐") + "\n", attributes: base)
+        var link = base
+        link[.link] = AppInfo.repoURL
+        text.append(NSAttributedString(string: "GitHub: OpenFabrica/piesi", attributes: link))
+        text.append(NSAttributedString(string: "\n", attributes: base))
+        link[.link] = AppInfo.xURL
+        text.append(NSAttributedString(string: "X: @daveylan2", attributes: link))
+        return text
+    }
+
     /// ⌘,：设置窗口。
     @objc func showSettingsWindow(_ sender: Any?) {
         settingsWindow.show()
@@ -239,8 +310,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 一批文件的完整处理：按文件头分成压缩包和普通文件。压缩包逐个浏览或解压（解压做完才轮到下一个）；
     /// 扩展名是压缩包但文件头认不出的（损坏、没下完）报「无法打开」，不能当普通文件去压缩；
-    /// 剩下的普通文件（拖到 Dock 图标 / 主窗口）合成一个压缩请求。
+    /// 剩下的普通文件（拖到 Dock 图标 / 主窗口）合成一个压缩请求。compressAll 时不分类，全部进压缩对话框。
     private func handle(_ request: OpenRequest) async {
+        if request.compressAll {
+            await compressor.start(sources: request.urls, parent: nil)
+            return
+        }
         var archives: [URL] = []
         var others: [URL] = []
         for url in request.urls {

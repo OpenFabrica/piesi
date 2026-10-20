@@ -6,6 +6,8 @@ struct OpenRequest: Sendable {
     let urls: [URL]
     /// 压缩包：true = 浏览窗口，false = 直接解压；普通文件不受影响，一律进压缩对话框
     let browse: Bool
+    /// true = 不分压缩包和普通文件，全部进压缩对话框（Finder 右键「用 Piesi 压缩」）
+    var compressAll = false
 }
 
 /// 串行队列。start() 之前到的请求先攒着（Finder 的 open 事件比 didFinishLaunching 早）。

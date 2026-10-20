@@ -92,14 +92,19 @@ enum CoreBridge {
     }
 }
 
-/// 主 app 自身的版本信息，从 Info.plist 读（版本号来源是 Config/Version.xcconfig）。
+/// 主 app 自身的版本信息（从 Info.plist 读，版本号来源是 Config/Version.xcconfig）与项目链接。
 enum AppInfo {
-    /// 「Piesi 0.1.0-dev · core 0.1.0-dev」这一行
-    static var versionLine: String {
+    /// GitHub 仓库（与 Cargo.toml 的 repository 一致）
+    static let repoURL = URL(string: "https://github.com/OpenFabrica/piesi")!
+    /// 作者的 X 账号
+    static let xURL = URL(string: "https://x.com/daveylan2")!
+
+    /// 带开发后缀的版本号，如「0.1.0-dev」（关于面板用）
+    static var version: String {
         let info = Bundle.main.infoDictionary ?? [:]
         let version = info["CFBundleShortVersionString"] as? String ?? "?"
         let suffix = info["PiesiVersionSuffix"] as? String ?? ""
-        return "Piesi \(version)\(suffix) · core \(CoreBridge.version)"
+        return "\(version)\(suffix)"
     }
 }
 

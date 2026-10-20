@@ -23,7 +23,7 @@ enum MainMenu {
 
     private static func appMenu() -> NSMenuItem {
         let menu = NSMenu(title: "Piesi")
-        menu.addItem(withTitle: String(localized: "关于 Piesi"), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "关于 Piesi"), action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: String(localized: "设置…"), action: #selector(AppDelegate.showSettingsWindow(_:)), keyEquivalent: ",")
         menu.addItem(.separator())

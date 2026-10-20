@@ -81,7 +81,7 @@ enum DragExport {
 
         // 合成目录（id == max）没有真实条目，用 idsUnder 一次拿到它下面的全部 id
         let ids = row.id == UInt32.max ? handle.idsUnder(dir: row.path) : [row.id]
-        let request = ExtractRequest(dest: temp.path, smartFolder: false, conflict: .overwrite, skipJunk: true, ids: ids)
+        let request = ExtractRequest(dest: temp.path, smartFolder: false, conflict: .overwrite, skipJunk: true, ids: ids, mergeIntoExisting: false)
         let listener = SilentProgress()
         _ = try handle.extract(request: request, listener: listener, cancel: CancelHandle())
 
