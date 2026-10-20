@@ -15,6 +15,7 @@
       更新日志手写，面向用户，一行一条。先按上个标签以来的 `git log` 起草，给用户看过再定稿。
    3. 提交 `chore(release): <版本>`，打注释标签 `v<版本>`，推送分支和标签。
       标签推上 GitHub 后，`.github/workflows/release.yml` 自动跑 `scripts/package.sh`（门禁 → 通用二进制 → Developer ID 签名 → 公证 → 用 Sparkle 私钥生成 `appcast.xml` → DMG 与 appcast 一起传到 Release）；需要的 Secrets 写在该文件开头的注释里。
+      **还没配 Secrets 时**（工作流会跳过）：标签推上去以后在本机跑 `RELEASE=1 scripts/package.sh`（公证用钥匙串 profile，appcast 用钥匙串里账户 `piesi` 的 Sparkle 私钥），再 `gh release create v<版本> dist/Piesi-<版本>.dmg dist/appcast.xml --title "Piesi <版本>" --notes-file <本版说明>` 上传。
       自动更新按 `CFBundleVersion`（= `MARKETING_VERSION`）比新旧，所以每次发版版本号必须比上一版大；老用户靠「latest」Release 里的 `appcast.xml` 发现新版，预发布不会推给他们。
    4. **标签推出去后，马上再做一个提交，把版本号推到下一个开发版，并推送。**
       默认补丁号加一（`0.1.0` → `0.1.1-dev`）；预发布串把最后一个数字加一（`0.1.0-alpha.2` → `0.1.0-alpha.3-dev`）。

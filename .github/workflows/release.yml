@@ -16,7 +16,22 @@ permissions:
   contents: write
 
 jobs:
+  # 没配签名 Secret 时整个发版任务跳过（显示为 skipped，不是失败）：
+  # 那时在本机跑 `RELEASE=1 scripts/package.sh`，再用 `gh release create` 上传（docs/release.md 5.3）
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.secrets.outputs.ready }}
+    steps:
+      - id: secrets
+        env:
+          P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+        run: |
+          if [ -n "$P12_BASE64" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"; else echo "::notice::没配 DEVELOPER_ID_P12_BASE64，跳过 CI 发版"; fi
+
   dmg:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
