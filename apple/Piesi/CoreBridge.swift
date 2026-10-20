@@ -71,16 +71,10 @@ enum CoreBridge {
         }.value
     }
 
-    /// 错误转成给用户看的中文；Rust 的 #[error] 文案只有 Other 带过来，其余按 case 翻译。
+    /// 错误转成给用户看的文案：核心错误按变体本地化（CoreText.swift），别的错误用系统描述。
     static func message(for error: Error) -> String {
         if let e = error as? PiesiError {
-            switch e {
-            case .UnknownFormat: return "无法识别的压缩格式"
-            case .PasswordRequired: return "需要密码"
-            case .WrongPassword: return "密码错误"
-            case .Cancelled: return "已取消"
-            case .Other(let message): return message
-            }
+            return e.localizedText
         }
         return error.localizedDescription
     }
