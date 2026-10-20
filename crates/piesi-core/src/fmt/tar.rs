@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use crate::archive::{ArchiveReader, Entry, EntryId, EntryKind, EntrySink, ExtractReport, Format, IndexState, Method};
 use crate::progress::{OpContext, Throttle};
 use crate::warning::{Warning, WarningKind};
-use crate::{Error, Result};
+use crate::{DetailKind, Error, ErrorDetail, Result};
 
 /// 文件读缓冲大小：解码器一次喂 256 KB，减少系统调用。
 const STREAM_BUF: usize = 256 * 1024;
@@ -42,7 +42,7 @@ impl TarReader {
         } else if format.is_single_stream() {
             (vec![single_stream_entry(path, format)?], vec![TarKind::Regular])
         } else {
-            return Err(Error::Unsupported(format!("tar 驱动不处理 {}", format.display_name())));
+            return Err(Error::Unsupported(ErrorDetail::with(DetailKind::TarDriverMismatch, format.display_name())));
         };
         Ok(Self { path: path.to_path_buf(), format, entries, kinds })
     }
@@ -57,7 +57,7 @@ impl TarReader {
             // 展开大小可能未知（entry.size 为 0），进度只能按已解码字节走
             let mut counting = CountingReader::new(stream.as_mut(), throttle);
             let r = sink.file(entry, &mut counting);
-            counting.finish(r, Error::Corrupt)?;
+            counting.finish(r, Error::corrupt)?;
             report.extracted += 1;
         }
         Ok(report)
@@ -76,7 +76,7 @@ impl TarReader {
             }
             let i = item.index;
             if i >= entries.len() {
-                return Err(Error::Corrupt("压缩包内容与打开时建立的索引不一致".into()));
+                return Err(Error::Corrupt(DetailKind::IndexMismatch.into()));
             }
             if !selected[i] {
                 return Ok(true);
@@ -104,7 +104,7 @@ impl TarReader {
                 TarKind::Regular => {
                     let mut counting = CountingReader::new(item.data, &mut *throttle);
                     let r = sink.file(entry, &mut counting);
-                    counting.finish(r, Error::Corrupt)?;
+                    counting.finish(r, Error::corrupt)?;
                     report.extracted += 1;
                 }
             }
@@ -171,7 +171,7 @@ fn open_stream(path: &Path, format: Format) -> Result<Box<dyn Read>> {
             Box::new(liblzma::bufread::XzDecoder::new_stream(file, stream))
         }
         Format::TarZst | Format::Zst => Box::new(zstd::stream::read::Decoder::with_buffer(file)?),
-        other => return Err(Error::Unsupported(other.display_name().to_owned())),
+        other => return Err(Error::Unsupported(ErrorDetail::with(DetailKind::Plain, other.display_name()))),
     })
 }
 
@@ -214,7 +214,7 @@ impl TarSource {
 /// 把 tar crate 的条目迭代器翻译成 `TarItem` 回调；GNU/pax 长名由 tar crate 处理。
 fn walk_entries<R: Read>(entries: tar::Entries<'_, R>, visit: &mut dyn FnMut(TarItem<'_>) -> Result<bool>) -> Result<()> {
     for (index, entry) in entries.enumerate() {
-        let mut entry = entry.map_err(|e| Error::Corrupt(format!("tar 第 {} 个条目读取失败：{e}", index + 1)))?;
+        let mut entry = entry.map_err(|e| Error::Corrupt(ErrorDetail::with_args(DetailKind::TarEntryReadFailed, [(index + 1).to_string(), e.to_string()])))?;
         let path = entry.path_bytes().into_owned();
         let link = entry.link_name_bytes().map(|l| l.into_owned());
         let size = entry.size();

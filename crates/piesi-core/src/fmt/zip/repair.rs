@@ -9,7 +9,7 @@ use super::cd::{self, HeaderFields, RawEntry, SIG_CD, SIG_DESC, SIG_LOCAL};
 use super::local;
 use super::{split, ZipReader};
 use crate::archive::{Entry, EntryId};
-use crate::{Error, Result};
+use crate::{DetailKind, Error, Result};
 
 /// 扫描块大小。
 const CHUNK: usize = 256 * 1024;
@@ -34,7 +34,7 @@ impl ZipReader {
             }
         }
         if entries.is_empty() {
-            return Err(Error::Corrupt("扫描不到任何完整条目".into()));
+            return Err(Error::Corrupt(DetailKind::RepairNoEntries.into()));
         }
         Ok(Self::from_parts(source, entries, raws, Vec::new()))
     }
@@ -82,7 +82,7 @@ fn scan_one<S: Read + Seek>(src: &mut S, p: u64, len: u64, idx: usize) -> Result
     let mut extra = vec![0u8; lh.extra_len];
     src.read_exact(&mut name)?;
     src.read_exact(&mut extra)?;
-    let id = EntryId::try_from(idx).map_err(|_| Error::Corrupt("条目数超过上限".into()))?;
+    let id = EntryId::try_from(idx).map_err(|_| Error::Corrupt(DetailKind::TooManyEntries.into()))?;
     let mut fields = HeaderFields {
         version_made_by: 0,
         flags: lh.flags,

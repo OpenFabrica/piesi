@@ -11,7 +11,7 @@ use super::tar::{progress_name, selection_mask, CountingReader, WriterSink};
 use crate::archive::{ArchiveReader, Entry, EntryId, EntryKind, EntrySink, ExtractReport, Format, Method, PasswordNeed};
 use crate::progress::{OpContext, Throttle};
 use crate::volumes::{collect_volumes, ChainedReader};
-use crate::{Error, Result};
+use crate::{DetailKind, Error, ErrorDetail, Result};
 
 /// 符号链接内容（目标路径）的上限：超过它就不是正常的链接，按损坏处理。
 const MAX_SYMLINK_TARGET: u64 = 64 * 1024;
@@ -116,7 +116,7 @@ impl SevenZReader {
             total_entries += 1;
             if let Some(b) = file_block.get(i).copied().flatten() {
                 // 头里的块号是不可信数据，越界就当包坏了
-                *last_needed.get_mut(b).ok_or_else(|| Error::Corrupt("7z：条目引用了不存在的块".into()))? = Some(i);
+                *last_needed.get_mut(b).ok_or_else(|| Error::Corrupt(DetailKind::SevenZMissingBlock.into()))? = Some(i);
             }
         }
         // 进度总量 = 真正要解码的字节：每块从块首到最后一个选中条目，中间跳过的也算
@@ -125,7 +125,7 @@ impl SevenZReader {
         let mut total_bytes = 0u64;
         for (b, last) in last_needed.iter().enumerate() {
             if let Some(last) = last {
-                let first = *block_first_file.get(b).ok_or_else(|| Error::Corrupt("7z：块与文件表对不上".into()))?;
+                let first = *block_first_file.get(b).ok_or_else(|| Error::Corrupt(DetailKind::SevenZBlockMismatch.into()))?;
                 total_bytes += archive.files.get(first..=*last).unwrap_or_default().iter().map(|f| f.size).sum::<u64>();
             }
         }
@@ -155,7 +155,7 @@ impl SevenZReader {
             if encrypted && self.password.is_empty() {
                 return Err(Error::PasswordRequired);
             }
-            let mut next_index = *block_first_file.get(b).ok_or_else(|| Error::Corrupt("7z：块与文件表对不上".into()))?;
+            let mut next_index = *block_first_file.get(b).ok_or_else(|| Error::Corrupt(DetailKind::SevenZBlockMismatch.into()))?;
             // sink 的错误不能穿过 sevenz 的闭包签名，先存在这里，返回 Ok(false) 让它停下
             let mut failure: Option<Error> = None;
             let entries = &self.entries;
@@ -168,12 +168,12 @@ impl SevenZReader {
                     return Ok(false);
                 }
                 let Some(entry) = entries.get(i) else {
-                    failure = Some(Error::Corrupt("块与文件表对不上".into()));
+                    failure = Some(Error::Corrupt(DetailKind::SevenZBlockMismatch.into()));
                     return Ok(false);
                 };
                 // 名字核对：stream_map 与 files 不一致说明包坏了，别把数据写错地方
                 if sz_entry.name.replace('\\', "/").as_bytes() != entry.raw_name.as_slice() {
-                    failure = Some(Error::Corrupt(format!("块内条目与目录不一致：{}", sz_entry.name)));
+                    failure = Some(Error::Corrupt(ErrorDetail::with(DetailKind::SevenZEntryMismatch, &sz_entry.name)));
                     return Ok(false);
                 }
                 if selected[i] {
@@ -190,7 +190,7 @@ impl SevenZReader {
                     // 这是 7z solid 格式的代价（只花时间，内存仍只占字典）
                     counting.drain().map(|_| ()).map_err(Error::from)
                 };
-                let on_inner = |msg: String| if encrypted { Error::WrongPassword } else { Error::Corrupt(msg) };
+                let on_inner = |msg: String| if encrypted { Error::WrongPassword } else { Error::corrupt(msg) };
                 match counting.finish(result, on_inner) {
                     Ok(()) => Ok(true),
                     Err(e) => {
@@ -222,7 +222,7 @@ fn deliver_entry(
         let mut target = Vec::new();
         data.by_ref().take(MAX_SYMLINK_TARGET + 1).read_to_end(&mut target)?;
         if target.len() as u64 > MAX_SYMLINK_TARGET {
-            return Err(Error::Corrupt(format!("符号链接目标过长：{}", progress_name(entry))));
+            return Err(Error::Corrupt(ErrorDetail::with(DetailKind::SymlinkTargetTooLong, progress_name(entry))));
         }
         sink.symlink(entry, &target)?;
     } else {
@@ -384,10 +384,10 @@ fn map_header_error(e: SzError) -> Error {
     match e {
         SzError::PasswordRequired => Error::PasswordRequired,
         SzError::MaybeBadPassword(_) => Error::WrongPassword,
-        SzError::UnsupportedCompressionMethod(m) => Error::Unsupported(format!("7z 压缩方法 {m}")),
-        SzError::Unsupported(m) | SzError::Other(m) if m.contains("unsupported") => Error::Unsupported(format!("7z：{m}")),
+        SzError::UnsupportedCompressionMethod(m) => Error::Unsupported(ErrorDetail::with(DetailKind::SevenZMethod, m)),
+        SzError::Unsupported(m) | SzError::Other(m) if m.contains("unsupported") => Error::Unsupported(ErrorDetail::with(DetailKind::SevenZLibrary, m)),
         SzError::Io(e, _) | SzError::FileOpen(e, _) => Error::Io(e),
-        other => Error::Corrupt(format!("7z：{other}")),
+        other => Error::Corrupt(ErrorDetail::with(DetailKind::SevenZLibrary, other)),
     }
 }
 
@@ -396,9 +396,9 @@ fn map_data_error(e: SzError, encrypted: bool) -> Error {
     match e {
         SzError::PasswordRequired => Error::PasswordRequired,
         SzError::MaybeBadPassword(_) => Error::WrongPassword,
-        SzError::UnsupportedCompressionMethod(m) => Error::Unsupported(format!("7z 压缩方法 {m}")),
-        SzError::Unsupported(m) => Error::Unsupported(format!("7z：{m}")),
+        SzError::UnsupportedCompressionMethod(m) => Error::Unsupported(ErrorDetail::with(DetailKind::SevenZMethod, m)),
+        SzError::Unsupported(m) => Error::Unsupported(ErrorDetail::with(DetailKind::SevenZLibrary, m)),
         SzError::ChecksumVerificationFailed | SzError::Io(..) if encrypted => Error::WrongPassword,
-        other => Error::Corrupt(format!("7z：{other}")),
+        other => Error::Corrupt(ErrorDetail::with(DetailKind::SevenZLibrary, other)),
     }
 }

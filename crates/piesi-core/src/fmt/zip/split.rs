@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::volumes::{collect_volumes, ChainedReader};
-use crate::{Error, Result};
+use crate::{DetailKind, Error, ErrorDetail, Result};
 
 /// 盘数上限：PKWARE 的盘号是 16 位（zip64 为 32 位），实际没人超过这个数，拿它挡住畸形输入。
 const MAX_DISKS: u32 = 65_536;
@@ -25,7 +25,7 @@ impl Source {
             for p in &parts {
                 disk_base.push(total);
                 let len = std::fs::metadata(p)?.len();
-                total = total.checked_add(len).ok_or_else(|| Error::Corrupt("分卷总长溢出".into()))?;
+                total = total.checked_add(len).ok_or_else(|| Error::Corrupt(DetailKind::VolumeTotalOverflow.into()))?;
             }
         }
         let reader = ChainedReader::open(&parts)?;
@@ -60,11 +60,11 @@ pub fn open_initial(path: &Path) -> Result<Source> {
 /// PKWARE 多盘：`name.zip` 的兄弟卷是 `name.z01`…`name.z(N-1)`，最后一盘就是 `name.zip` 本身。
 pub fn open_pkware(path: &Path, total_disks: u32) -> Result<Source> {
     if !(2..=MAX_DISKS).contains(&total_disks) {
-        return Err(Error::Corrupt(format!("分卷数非法：{total_disks}")));
+        return Err(Error::Corrupt(ErrorDetail::with(DetailKind::VolumeCountInvalid, total_disks)));
     }
     let mut parts = Vec::with_capacity(total_disks as usize);
     for i in 1..total_disks {
-        let p = sibling(path, i).ok_or_else(|| Error::Corrupt(format!("缺少分卷：{}", sibling_name(path, i))))?;
+        let p = sibling(path, i).ok_or_else(|| Error::Corrupt(ErrorDetail::with(DetailKind::VolumeMissing, sibling_name(path, i))))?;
         parts.push(p);
     }
     parts.push(path.to_path_buf());

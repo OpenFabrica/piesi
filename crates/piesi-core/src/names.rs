@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::detail::{DetailKind, ErrorDetail};
 use crate::error::{Error, Result};
 
 /// APFS 单个路径分量的上限：255 字节（不是字符）。
@@ -50,15 +51,15 @@ pub fn is_junk_path(path: &str) -> bool {
 /// `UnsafePath`，调用方应把它当作「跳过」而不是错误中止。
 pub fn sanitize_rel_path(raw: &str) -> Result<String> {
     if raw.chars().any(|c| c.is_control()) {
-        return Err(Error::UnsafePath(format!("含控制字符：{}", raw.escape_debug())));
+        return Err(Error::UnsafePath(ErrorDetail::with(DetailKind::PathControlChars, raw.escape_debug())));
     }
     let unified = raw.replace('\\', "/");
     if unified.starts_with('/') {
         // 覆盖 `/abs`、`//server/share`、`//?/C:/x`
-        return Err(Error::UnsafePath(format!("绝对路径：{raw}")));
+        return Err(Error::UnsafePath(ErrorDetail::with(DetailKind::PathAbsolute, raw)));
     }
     if has_drive_prefix(&unified) {
-        return Err(Error::UnsafePath(format!("Windows 盘符：{raw}")));
+        return Err(Error::UnsafePath(ErrorDetail::with(DetailKind::PathDrivePrefix, raw)));
     }
     // 去前导 `./`（可能叠多层，tar -cf x.tar . 的产物就是 `./a/b`）
     let mut rest = unified.as_str();
@@ -69,12 +70,12 @@ pub fn sanitize_rel_path(raw: &str) -> Result<String> {
     for part in rest.split('/') {
         match part {
             "" => continue,
-            "." | ".." => return Err(Error::UnsafePath(format!("路径含 `{part}` 分量：{raw}"))),
+            "." | ".." => return Err(Error::UnsafePath(ErrorDetail::with_args(DetailKind::PathDotComponent, [part.to_owned(), raw.to_owned()]))),
             _ => parts.push(part),
         }
     }
     if parts.is_empty() {
-        return Err(Error::UnsafePath(format!("空路径：{raw:?}")));
+        return Err(Error::UnsafePath(ErrorDetail::with(DetailKind::PathEmpty, format!("{raw:?}"))));
     }
     Ok(parts.join("/"))
 }

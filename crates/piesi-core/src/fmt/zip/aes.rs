@@ -9,7 +9,7 @@ use hmac::{Hmac, Mac};
 use sha1::Sha1;
 
 use super::extra::AesInfo;
-use crate::{Error, Result};
+use crate::{DetailKind, Error, ErrorDetail, Result};
 
 type HmacSha1 = Hmac<Sha1>;
 
@@ -45,12 +45,12 @@ enum AnyAes {
 impl AnyAes {
     /// 按强度建块密码。
     fn new(strength: u8, key: &[u8]) -> Result<Self> {
-        let bad = |_| Error::Corrupt("AES 密钥长度错误".into());
+        let bad = |_| Error::Corrupt(DetailKind::AesKeyLength.into());
         Ok(match strength {
             1 => Self::A128(aes::Aes128::new_from_slice(key).map_err(bad)?),
             2 => Self::A192(aes::Aes192::new_from_slice(key).map_err(bad)?),
             3 => Self::A256(aes::Aes256::new_from_slice(key).map_err(bad)?),
-            s => return Err(Error::Unsupported(format!("AES 强度 {s}"))),
+            s => return Err(Error::Unsupported(ErrorDetail::with(DetailKind::AesStrength, s))),
         })
     }
 
@@ -72,7 +72,7 @@ fn derive(password: &[u8], salt: &[u8], strength: u8) -> Result<(AnyAes, HmacSha
     let mut dk = vec![0u8; 2 * key_len + VERIFY_LEN];
     pbkdf2::pbkdf2_hmac::<Sha1>(password, salt, PBKDF2_ROUNDS, &mut dk);
     let cipher = AnyAes::new(strength, &dk[..key_len])?;
-    let hmac = HmacSha1::new_from_slice(&dk[key_len..2 * key_len]).map_err(|_| Error::Corrupt("HMAC 密钥长度错误".into()))?;
+    let hmac = HmacSha1::new_from_slice(&dk[key_len..2 * key_len]).map_err(|_| Error::Corrupt(DetailKind::HmacKeyLength.into()))?;
     let mut verify = [0u8; VERIFY_LEN];
     verify.copy_from_slice(&dk[2 * key_len..]);
     Ok((cipher, hmac, verify))
@@ -133,12 +133,12 @@ impl<R: Read> AesReader<R> {
         let salt_len = info.salt_len();
         let overhead = (salt_len + VERIFY_LEN + AUTH_LEN) as u64;
         if packed_size < overhead {
-            return Err(Error::Corrupt("AES 条目长度不足".into()));
+            return Err(Error::Corrupt(DetailKind::AesEntryTooShort.into()));
         }
         let mut salt = [0u8; 16];
-        inner.read_exact(&mut salt[..salt_len]).map_err(|_| Error::Corrupt("AES 盐不完整".into()))?;
+        inner.read_exact(&mut salt[..salt_len]).map_err(|_| Error::Corrupt(DetailKind::AesSaltIncomplete.into()))?;
         let mut verify = [0u8; VERIFY_LEN];
-        inner.read_exact(&mut verify).map_err(|_| Error::Corrupt("AES 口令校验值不完整".into()))?;
+        inner.read_exact(&mut verify).map_err(|_| Error::Corrupt(DetailKind::AesVerifierIncomplete.into()))?;
 
         let (cipher, hmac, expected) = derive(password, &salt[..salt_len], info.strength)?;
         if expected != verify {
@@ -157,23 +157,23 @@ impl<R: Read> AesReader<R> {
         let mut sink = [0u8; 4096];
         while self.remaining > 0 {
             match self.read(&mut sink) {
-                Ok(0) => return Err(Error::Corrupt("AES 密文提前结束".into())),
+                Ok(0) => return Err(Error::Corrupt(DetailKind::AesCiphertextTruncated.into())),
                 Ok(_) => {}
                 Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => {
-                    return Err(Error::Corrupt("AES 密文提前结束".into()))
+                    return Err(Error::Corrupt(DetailKind::AesCiphertextTruncated.into()))
                 }
                 Err(e) => return Err(Error::Io(e)),
             }
         }
         let mut tag = [0u8; AUTH_LEN];
-        self.inner.read_exact(&mut tag).map_err(|_| Error::Corrupt("AES 认证码缺失".into()))?;
+        self.inner.read_exact(&mut tag).map_err(|_| Error::Corrupt(DetailKind::AesAuthCodeMissing.into()))?;
         self.verified = true;
         let Some(hmac) = self.hmac.take() else {
             return Ok(());
         };
         let full = hmac.finalize().into_bytes();
         if full[..AUTH_LEN] != tag {
-            return Err(Error::Corrupt("AES 认证失败：数据被改动或密码错误".into()));
+            return Err(Error::Corrupt(DetailKind::AesAuthFailed.into()));
         }
         Ok(())
     }

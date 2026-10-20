@@ -2,7 +2,7 @@
 
 use std::io::{self, Read};
 
-use crate::{Error, Result};
+use crate::{DetailKind, Error, Result};
 
 /// 标准 CRC-32 查表（反射多项式 0xEDB88320），密钥更新要逐字节查它。
 const CRC_TABLE: [u32; 256] = build_crc_table();
@@ -84,7 +84,7 @@ impl<R: Read> ZipCryptoReader<R> {
     pub fn new(mut inner: R, password: &[u8], check: u8) -> Result<Self> {
         let mut keys = Keys::new(password);
         let mut head = [0u8; 12];
-        inner.read_exact(&mut head).map_err(|_| Error::Corrupt("ZipCrypto 加密头不完整".into()))?;
+        inner.read_exact(&mut head).map_err(|_| Error::Corrupt(DetailKind::ZipCryptoHeaderIncomplete.into()))?;
         let mut last = 0u8;
         for b in head {
             last = keys.decrypt(b);

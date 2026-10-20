@@ -1,31 +1,15 @@
-//  CoreText.swift —— 核心（Rust）传来的结构化错误、警告 → 用户看的本地化文案。
+//  CoreText.swift —— 核心（Rust）传来的结构化警告 → 用户看的本地化文案。
 //  核心只给类型和参数（docs/design.md 5.5），句子在这里按 String Catalog 拼；CLI 走核心自己的中文 Display。
+//  错误（PiesiError / ErrorDetail）的文案在 apple/Shared/CoreErrorText.swift，Quick Look 扩展也要用。
 
 import Foundation
 
-extension PiesiError {
-    /// 错误的本地化文案：按变体翻译标题，核心给的细节（第三方库文案、系统错误）原样附在后面。
-    var localizedText: String {
-        switch self {
-        case .UnknownFormat: String(localized: "无法识别的压缩格式")
-        case .Unsupported(let detail): String(localized: "不支持：\(detail)")
-        case .Corrupt(let detail): String(localized: "压缩包损坏：\(detail)")
-        case .PasswordRequired: String(localized: "需要密码")
-        case .WrongPassword: String(localized: "密码错误")
-        case .Cancelled: String(localized: "已取消")
-        case .UnsafePath(let detail): String(localized: "不安全的路径：\(detail)")
-        case .NoSpace(let needed, let available): String(localized: "磁盘空间不足：需要 \(ByteText.string(needed))，可用 \(ByteText.string(available))")
-        case .Io(let message): message
-        case .Other(let message): message
-        }
-    }
-}
-
 extension Warning {
-    /// 警告的本地化文案：按 kind 查表，subject（哪个文件）和 detail（链接目标、新名、系统错误）原样填入。
+    /// 警告的本地化文案：按 kind 查表，subject（哪个文件）和 detail（链接目标、新名、系统错误）原样填入；不安全路径的原因单独翻译。
     var localizedText: String {
         switch kind {
-        case .unsafePathSkipped: String(localized: "跳过条目 \(subject)：\(detail)")
+        // detail 是核心的中文原因；按条目名重算一遍结构化原因再翻译（纯函数，和计划时结果一致），算不出来才退回原文
+        case .unsafePathSkipped: String(localized: "跳过条目 \(subject)：\(unsafePathReason(name: subject)?.localizedText ?? detail)")
         case .caseConflictRenamed: String(localized: "大小写冲突：\(subject) 改名为 \(detail)")
         case .hardLinkSkipped: String(localized: "\(subject)：硬链接暂不支持，已跳过")
         case .specialEntrySkipped: String(localized: "\(subject)：设备文件或管道，已跳过")

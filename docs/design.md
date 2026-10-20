@@ -159,13 +159,15 @@
 - 全程流式，永不整包进内存；解压前预检磁盘空间。
 
 ### 5.5 文案与本地化（核心侧已实现，2026-10-20）
-- 核心不产出成句的用户文案：警告是结构化的 `Warning { kind, subject, detail }`（`warning.rs`，18 种 `WarningKind`），错误是带变体的 `Error`。FFI 原样导出 `Warning` record 和 `WarningKind` enum；`PiesiError` 把常见错误分成独立变体（UnknownFormat / Unsupported / Corrupt / PasswordRequired / WrongPassword / Cancelled / UnsafePath / NoSpace / Io / Other）。
+- 核心不产出成句的用户文案：警告是结构化的 `Warning { kind, subject, detail }`（`warning.rs`，18 种 `WarningKind`），错误是带变体的 `Error`。FFI 原样导出 `Warning` record 和 `WarningKind` enum；`PiesiError` 把常见错误分成独立变体（UnknownFormat / Unsupported / Corrupt / PasswordRequired / WrongPassword / Cancelled / UnsafePath / NoSpace / Io / Other），其中 Unsupported / Corrupt / UnsafePath 带结构化细节 `ErrorDetail`（见本节最后一条）。
 - 壳层按 kind 和错误变体查本地化表拼句子（zh-Hans / zh-Hant / en / ja 各一份），`subject`（哪个文件）和 `detail`（链接目标、新名、系统错误）原样填进去。
 - CLI 用核心的 `Display`（中文）直接打印，`piesi` 本身不做多语言。
-- App 侧：代码里的文案字面量是简体原文，同时就是 String Catalog（`Localizable.xcstrings`、`InfoPlist.xcstrings`）的键；四种语言都明写在目录里。SwiftUI 的 `Text` / `Button` / `Toggle` 等拿字面量时自动当键，AppKit 侧（NSMenu、NSAlert、`stringValue`…）必须包 `String(localized:)`。核心错误 / 警告的句子在 `CoreText.swift` 里拼。
+- App 侧：代码里的文案字面量是简体原文，同时就是 String Catalog（`Localizable.xcstrings`、`InfoPlist.xcstrings`）的键；四种语言都明写在目录里。SwiftUI 的 `Text` / `Button` / `Toggle` 等拿字面量时自动当键，AppKit 侧（NSMenu、NSAlert、`stringValue`…）必须包 `String(localized:)`。警告的句子在 `CoreText.swift` 里拼；核心错误的句子在 `apple/Shared/CoreErrorText.swift`，主 app 和 Quick Look 扩展共用，所以两边的 `Localizable.xcstrings` 都要有这些键（lint 按 target 分别查）。
 - 回落语言是英文（`developmentLanguage: en`）：没覆盖的语言（德语、韩语…）看到英文而不是中文键；zh-CN → zh-Hans、zh-TW / zh-HK → zh-Hant（已用 `Bundle.preferredLocalizations` 验证）。
 - `apple/scripts/strings-lint.py` 找出没本地化的中文字面量、目录里缺的键和没人用的键；CI 和每次加文案后跑。
-- 已知取舍：`Corrupt` / `Unsupported` / `UnsafePath` 的 detail 是核心里的中文细节（如「7z：块与文件表对不上」），壳层只翻译标题。这些是罕见的技术信息，v1.0 不翻；要翻时把 detail 换成错误码即可，FFI 形状不变。
+- 错误细节已结构化（2026-10-20）：`Corrupt` / `Unsupported` / `UnsafePath` 带 `ErrorDetail { kind: DetailKind, args }`（`detail.rs`，81 种 `DetailKind`），会变的部分（条目名、偏移、方法号、路径）放 `args`，CRC 不匹配要三个参数所以用列表。核心 `Display` 仍出原来的中文句子，CLI 不变。FFI 用 `mirror_enum!` 宏导出同名 enum 和 record（双向转换由宏生成，变体对不上编译即失败）；壳层按 kind 拼本地化句子。第三方库 / 系统给的英文原文（sevenz-rust2、tar、liblzma 等）归 `Library`，格式名和路径归 `Plain`，两者原样显示、不翻。
+- 解压计划跳过不安全路径时的 `UnsafePathSkipped` 警告，detail 仍是核心的中文原因；App 用 FFI 的 `unsafe_path_reason(name)` 按条目名（警告的 subject）重算结构化原因再翻译，不改 `Warning` 的形状。
+- 仍是中文的：`Error::Other` 的少数文案（如「unrar 工作线程意外退出」「unrar：内存不足」），都是内部异常，罕见，暂不翻。
 
 ## 6. macOS 应用设计
 

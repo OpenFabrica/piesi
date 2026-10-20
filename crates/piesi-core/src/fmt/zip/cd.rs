@@ -7,7 +7,7 @@ use super::bytes::{self, Cursor};
 use super::extra::{self, AesInfo, Zip64Need};
 use super::time;
 use crate::archive::{Entry, EntryId, EntryKind, Method};
-use crate::{Error, Result};
+use crate::{DetailKind, Error, Result};
 
 /// 本地文件头签名。
 pub const SIG_LOCAL: [u8; 4] = *b"PK\x03\x04";
@@ -92,13 +92,13 @@ impl Eocd {
 /// 只有长度自洽的那条才是真的；都不自洽时退而取最靠后的，兼容注释长度写错的老工具。
 pub fn find_eocd<S: Read + Seek>(src: &mut S, len: u64) -> Result<Eocd> {
     if len < EOCD_LEN as u64 {
-        return Err(Error::Corrupt("文件太短，不是 zip".into()));
+        return Err(Error::Corrupt(DetailKind::ZipTooShort.into()));
     }
     let tail_len = len.min(EOCD_SEARCH) as usize;
     let tail_start = len - tail_len as u64;
     let mut tail = vec![0u8; tail_len];
     src.seek(SeekFrom::Start(tail_start))?;
-    src.read_exact(&mut tail).map_err(|_| Error::Corrupt("读取文件尾部失败".into()))?;
+    src.read_exact(&mut tail).map_err(|_| Error::Corrupt(DetailKind::ZipTailReadFailed.into()))?;
 
     let mut chosen = None;
     let mut fallback = None;
@@ -118,7 +118,7 @@ pub fn find_eocd<S: Read + Seek>(src: &mut S, len: u64) -> Result<Eocd> {
         end = i - 1;
     }
     let Some(i) = chosen.or(fallback) else {
-        return Err(Error::Corrupt("找不到中央目录结束记录（EOCD）".into()));
+        return Err(Error::Corrupt(DetailKind::EocdNotFound.into()));
     };
 
     let mut c = Cursor::new(&tail[i..]);
@@ -154,7 +154,7 @@ pub fn apply_zip64<S: Read + Seek>(
 ) -> Result<Option<u64>> {
     let Some(loc) = eocd.locator else {
         if eocd.saturated() {
-            return Err(Error::Corrupt("字段溢出但找不到 zip64 定位记录".into()));
+            return Err(Error::Corrupt(DetailKind::Zip64LocatorMissing.into()));
         }
         return Ok(None);
     };
@@ -167,7 +167,7 @@ pub fn apply_zip64<S: Read + Seek>(
     });
     if !ok {
         if eocd.saturated() {
-            return Err(Error::Corrupt("zip64 中央目录结束记录缺失或损坏".into()));
+            return Err(Error::Corrupt(DetailKind::Zip64EocdBad.into()));
         }
         return Ok(None);
     }
@@ -241,7 +241,7 @@ pub fn parse_cd<R: Read>(
         if fixed[..4] != SIG_CD {
             break;
         }
-        r.read_exact(&mut fixed[4..]).map_err(|_| Error::Corrupt("中央目录头不完整".into()))?;
+        r.read_exact(&mut fixed[4..]).map_err(|_| Error::Corrupt(DetailKind::CdHeaderIncomplete.into()))?;
         let mut c = Cursor::new(&fixed[4..]);
         let version_made_by = c.u16()?;
         let _version_needed = c.u16()?;
@@ -263,11 +263,11 @@ pub fn parse_cd<R: Read>(
         name.resize(name_len, 0);
         extra.resize(extra_len, 0);
         comment.resize(comment_len, 0);
-        r.read_exact(&mut name).map_err(|_| Error::Corrupt("中央目录条目名不完整".into()))?;
-        r.read_exact(&mut extra).map_err(|_| Error::Corrupt("中央目录扩展字段不完整".into()))?;
-        r.read_exact(&mut comment).map_err(|_| Error::Corrupt("中央目录条目注释不完整".into()))?;
+        r.read_exact(&mut name).map_err(|_| Error::Corrupt(DetailKind::CdNameIncomplete.into()))?;
+        r.read_exact(&mut extra).map_err(|_| Error::Corrupt(DetailKind::CdExtraIncomplete.into()))?;
+        r.read_exact(&mut comment).map_err(|_| Error::Corrupt(DetailKind::CdCommentIncomplete.into()))?;
 
-        let id = EntryId::try_from(entries.len()).map_err(|_| Error::Corrupt("条目数超过上限".into()))?;
+        let id = EntryId::try_from(entries.len()).map_err(|_| Error::Corrupt(DetailKind::TooManyEntries.into()))?;
         let fields = HeaderFields { version_made_by, flags, method, dos_time, dos_date, crc, packed, size, disk, external, offset };
         let (entry, raw) = build_entry(id, fields, &name, &extra, &resolve)?;
         entries.push(entry);
@@ -291,11 +291,11 @@ pub fn build_entry(
         disk: f.disk == 0xFFFF,
     };
     let parsed = extra::parse_extra(extra, name, need);
-    let missing = |what: &str| Error::Corrupt(format!("zip64 扩展字段缺少{what}"));
-    let size = if need.size { parsed.zip64.size.ok_or_else(|| missing("原始大小"))? } else { f.size };
-    let packed = if need.packed { parsed.zip64.packed.ok_or_else(|| missing("压缩后大小"))? } else { f.packed };
-    let offset = if need.offset { parsed.zip64.offset.ok_or_else(|| missing("本地头偏移"))? } else { f.offset };
-    let disk = if need.disk { parsed.zip64.disk.ok_or_else(|| missing("盘号"))? } else { f.disk };
+    let missing = |kind: DetailKind| Error::Corrupt(kind.into());
+    let size = if need.size { parsed.zip64.size.ok_or_else(|| missing(DetailKind::Zip64MissingSize))? } else { f.size };
+    let packed = if need.packed { parsed.zip64.packed.ok_or_else(|| missing(DetailKind::Zip64MissingPacked))? } else { f.packed };
+    let offset = if need.offset { parsed.zip64.offset.ok_or_else(|| missing(DetailKind::Zip64MissingOffset))? } else { f.offset };
+    let disk = if need.disk { parsed.zip64.disk.ok_or_else(|| missing(DetailKind::Zip64MissingDisk))? } else { f.disk };
     let local_offset = resolve(disk, offset)?;
 
     let raw_name: Vec<u8> = name.iter().map(|&b| if b == b'\\' { b'/' } else { b }).collect();

@@ -9,7 +9,7 @@ use piesi_core::encoding::NameEncoding;
 use piesi_core::facade::Archive;
 use piesi_core::plan::{ConflictPolicy, ExtractOptions};
 use piesi_core::progress::{CancelToken, OpContext, Progress, ProgressEvent};
-use piesi_core::{EntryKind, PasswordNeed, Warning as CoreWarning, WarningKind as CoreWarningKind};
+use piesi_core::{DetailKind as CoreDetailKind, EntryKind, ErrorDetail as CoreErrorDetail, PasswordNeed, Warning as CoreWarning, WarningKind as CoreWarningKind};
 
 uniffi::setup_scaffolding!();
 
@@ -25,17 +25,17 @@ pub fn detect_format_name(path: String) -> Option<String> {
     piesi_core::detect_format(Path::new(&path)).ok().flatten().map(|f| f.display_name().to_owned())
 }
 
-/// 跨语言错误。壳层按变体翻译标题；`detail` / `message` 是核心给的细节（第三方库文案、系统错误），原样附在后面。
+/// 跨语言错误。壳层按变体翻译标题；`detail` 是结构化细节，按 `DetailKind` 翻译；`message` 是系统错误等原文，原样附在后面。
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum PiesiError {
     #[error("无法识别的压缩格式")]
     UnknownFormat,
     /// 格式认得出但功能不支持（某种压缩方法、RAR 引用记录等）
     #[error("不支持：{detail}")]
-    Unsupported { detail: String },
+    Unsupported { detail: ErrorDetail },
     /// 压缩包数据损坏或结构不一致
     #[error("压缩包损坏：{detail}")]
-    Corrupt { detail: String },
+    Corrupt { detail: ErrorDetail },
     #[error("需要密码")]
     PasswordRequired,
     #[error("密码错误")]
@@ -44,7 +44,7 @@ pub enum PiesiError {
     Cancelled,
     /// 条目路径不安全（绝对路径、`..`、盘符等）
     #[error("不安全的路径：{detail}")]
-    UnsafePath { detail: String },
+    UnsafePath { detail: ErrorDetail },
     /// 目标磁盘放不下
     #[error("磁盘空间不足：需要 {needed} 字节，可用 {available} 字节")]
     NoSpace { needed: u64, available: u64 },
@@ -60,16 +60,261 @@ impl From<piesi_core::Error> for PiesiError {
         use piesi_core::Error as E;
         match e {
             E::UnknownFormat => PiesiError::UnknownFormat,
-            E::Unsupported(detail) => PiesiError::Unsupported { detail },
-            E::Corrupt(detail) => PiesiError::Corrupt { detail },
+            E::Unsupported(detail) => PiesiError::Unsupported { detail: detail.into() },
+            E::Corrupt(detail) => PiesiError::Corrupt { detail: detail.into() },
             E::PasswordRequired => PiesiError::PasswordRequired,
             E::WrongPassword => PiesiError::WrongPassword,
             E::Cancelled => PiesiError::Cancelled,
-            E::UnsafePath(detail) => PiesiError::UnsafePath { detail },
+            E::UnsafePath(detail) => PiesiError::UnsafePath { detail: detail.into() },
             E::NoSpace { needed, available } => PiesiError::NoSpace { needed, available },
             E::Io(e) => PiesiError::Io { message: e.to_string() },
             other => PiesiError::Other { message: other.to_string() },
         }
+    }
+}
+
+/// 定义一个和核心枚举逐个对应的 FFI 枚举，并生成双向 `From`。
+/// 为什么用宏：`DetailKind` 有几十个变体，手写定义 + 两个方向的 match 要抄三遍，容易漏；变体名对不上会直接编译失败。
+macro_rules! mirror_enum {
+    ($(#[$meta:meta])* pub enum $name:ident mirrors $core:ident { $($(#[$vmeta:meta])* $v:ident,)* }) => {
+        $(#[$meta])*
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+        pub enum $name {
+            $($(#[$vmeta])* $v,)*
+        }
+
+        impl From<$core> for $name {
+            fn from(k: $core) -> Self {
+                match k {
+                    $($core::$v => $name::$v,)*
+                }
+            }
+        }
+
+        impl From<$name> for $core {
+            fn from(k: $name) -> Self {
+                match k {
+                    $($name::$v => $core::$v,)*
+                }
+            }
+        }
+    };
+}
+
+mirror_enum! {
+    /// 错误细节类型，和核心的 `DetailKind` 一一对应；文案由壳层按类型本地化（见核心 `detail.rs` 每个变体的说明）。
+    pub enum DetailKind mirrors CoreDetailKind {
+        /// 第三方库或系统给的文案，翻不了，原样显示。args = [原文]
+        Library,
+        /// 只有一个名字（格式名、路径），原样显示。args = [名字]
+        Plain,
+
+        // ---- 路径（UnsafePath）----
+        /// 路径含控制字符。args = [转义后的路径]
+        PathControlChars,
+        /// 绝对路径。args = [路径]
+        PathAbsolute,
+        /// 带 Windows 盘符。args = [路径]
+        PathDrivePrefix,
+        /// 含 `.` / `..` 分量。args = [分量, 路径]
+        PathDotComponent,
+        /// 空路径。args = [带引号的原始名]
+        PathEmpty,
+
+        // ---- 通用 ----
+        /// 条目序号越界
+        EntryIndexOutOfRange,
+        /// 条目数超过上限
+        TooManyEntries,
+        /// 符号链接目标过长。args = [条目名]
+        SymlinkTargetTooLong,
+        /// 压缩包内容与打开时建立的索引不一致
+        IndexMismatch,
+        /// 不支持的压缩方法。args = [方法]
+        CompressionMethod,
+        /// 解压失败（解码层的 io 错误）。args = [错误原文]
+        DecompressFailed,
+
+        // ---- RAR ----
+        /// RAR 压缩包头损坏
+        RarArchiveHeaderBad,
+        /// RAR 文件头损坏
+        RarFileHeaderBad,
+        /// RAR 数据 CRC 校验失败
+        RarCrcFailed,
+        /// 不是 RAR 压缩包
+        NotRar,
+        /// 找不到下一个分卷
+        NextVolumeMissing,
+        /// RAR 读取错误
+        RarReadError,
+        /// RAR 未知的格式或加密方式
+        RarUnknownFormat,
+        /// RAR 引用记录需要完整解压
+        RarReference,
+
+        // ---- 7z ----
+        /// 7z 条目引用了不存在的块
+        SevenZMissingBlock,
+        /// 7z 块与文件表对不上
+        SevenZBlockMismatch,
+        /// 7z 块内条目与目录不一致。args = [条目名]
+        SevenZEntryMismatch,
+        /// 7z 不支持的压缩方法。args = [方法]
+        SevenZMethod,
+        /// sevenz-rust2 给的文案，前面带「7z：」。args = [原文]
+        SevenZLibrary,
+
+        // ---- tar ----
+        /// tar 驱动收到了非 tar 格式（内部错误）。args = [格式名]
+        TarDriverMismatch,
+        /// tar 某个条目读取失败。args = [序号（从 1 起）, 错误原文]
+        TarEntryReadFailed,
+        /// 写 tar 时给了非 tar 格式（内部错误）。args = [格式]
+        NotTarFormat,
+
+        // ---- zip 结构 ----
+        /// 文件太短，不是 zip
+        ZipTooShort,
+        /// 读取文件尾部失败
+        ZipTailReadFailed,
+        /// 找不到中央目录结束记录（EOCD）
+        EocdNotFound,
+        /// 字段溢出但找不到 zip64 定位记录
+        Zip64LocatorMissing,
+        /// zip64 中央目录结束记录缺失或损坏
+        Zip64EocdBad,
+        /// 中央目录头不完整
+        CdHeaderIncomplete,
+        /// 中央目录条目名不完整
+        CdNameIncomplete,
+        /// 中央目录扩展字段不完整
+        CdExtraIncomplete,
+        /// 中央目录条目注释不完整
+        CdCommentIncomplete,
+        /// zip64 扩展字段缺少原始大小
+        Zip64MissingSize,
+        /// zip64 扩展字段缺少压缩后大小
+        Zip64MissingPacked,
+        /// zip64 扩展字段缺少本地头偏移
+        Zip64MissingOffset,
+        /// zip64 扩展字段缺少盘号
+        Zip64MissingDisk,
+        /// 中央目录越界
+        CdOutOfRange,
+        /// 中央目录位置不对，读不到任何条目
+        CdMisplaced,
+        /// 偏移溢出
+        OffsetOverflow,
+        /// 引用了不存在的分卷。args = [盘号]
+        DiskMissing,
+        /// 记录不完整（字段越界）
+        RecordTruncated,
+        /// 本地文件头签名不对
+        LocalHeaderBadSignature,
+        /// 本地文件头偏移越界。args = [偏移]
+        LocalHeaderOffsetOutOfRange,
+        /// 本地文件头不完整
+        LocalHeaderIncomplete,
+        /// 本地文件头越界
+        LocalHeaderOutOfRange,
+        /// 条目数据越界。args = [条目名]
+        EntryDataOutOfRange,
+        /// 数据提前结束。args = [条目名]
+        DataTruncated,
+        /// CRC 不匹配。args = [条目名, 期望值, 实际值]（8 位十六进制）
+        CrcMismatch,
+        /// 修复扫描不到任何完整条目
+        RepairNoEntries,
+
+        // ---- zip 加密 ----
+        /// PKWARE 强加密不支持
+        PkwareStrongEncryption,
+        /// AES 条目缺少 0x9901 扩展字段
+        AesExtraMissing,
+        /// AES 密钥长度错误
+        AesKeyLength,
+        /// 不支持的 AES 强度。args = [强度值]
+        AesStrength,
+        /// HMAC 密钥长度错误
+        HmacKeyLength,
+        /// AES 条目长度不足
+        AesEntryTooShort,
+        /// AES 盐不完整
+        AesSaltIncomplete,
+        /// AES 口令校验值不完整
+        AesVerifierIncomplete,
+        /// AES 密文提前结束
+        AesCiphertextTruncated,
+        /// AES 认证码缺失
+        AesAuthCodeMissing,
+        /// AES 认证失败：数据被改动或密码错误
+        AesAuthFailed,
+        /// ZipCrypto 加密头不完整
+        ZipCryptoHeaderIncomplete,
+
+        // ---- zip 分卷 ----
+        /// 分卷总长溢出
+        VolumeTotalOverflow,
+        /// 分卷数非法。args = [分卷数]
+        VolumeCountInvalid,
+        /// 缺少分卷。args = [分卷文件名]
+        VolumeMissing,
+
+        // ---- 编解码参数 ----
+        /// 流头部不完整。args = [编解码器名，如 LZMA]
+        StreamHeaderIncomplete,
+        /// LZMA 属性字节非法
+        LzmaPropsInvalid,
+        /// LZMA 字典过大。args = [MB 数]
+        LzmaDictTooLarge,
+        /// LZMA 属性长度非法。args = [长度]
+        LzmaPropsLength,
+        /// LZMA 属性不足 5 字节
+        LzmaPropsShort,
+        /// LZMA2 缺少属性字节
+        Lzma2PropsMissing,
+        /// LZMA2 字典过大
+        Lzma2DictTooLarge,
+        /// 不支持的 PPMd 恢复模式。args = [模式号]
+        PpmdRestoreMode,
+        /// PPMd 参数非法。args = [错误原文]
+        PpmdParamsInvalid,
+        /// PPMd 内存需求过大。args = [MB 数]
+        PpmdMemTooLarge,
+        /// PPMd 属性不足 5 字节
+        PpmdPropsShort,
+    }
+}
+
+/// 错误细节：类型 + 参数（顺序见核心 `DetailKind` 各变体说明）。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct ErrorDetail {
+    pub kind: DetailKind,
+    pub args: Vec<String>,
+}
+
+impl From<CoreErrorDetail> for ErrorDetail {
+    fn from(d: CoreErrorDetail) -> Self {
+        ErrorDetail { kind: d.kind.into(), args: d.args }
+    }
+}
+
+impl std::fmt::Display for ErrorDetail {
+    /// 中文文案借核心的 Display（`PiesiError` 的 Display 要用它）；壳层不走这里。
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        CoreErrorDetail { kind: self.kind.into(), args: self.args.clone() }.fmt(f)
+    }
+}
+
+/// 条目名为什么不安全（解压计划跳过它时给的 `UnsafePathSkipped` 警告用）；名字安全返回 None。
+/// 为什么单独导出：警告的 detail 是中文成句，壳层拿条目名（警告的 subject）重算一遍结构化原因再本地化，
+/// 不用改 `Warning` 的形状；`sanitize_rel_path` 是纯函数，结果和计划时一致。
+#[uniffi::export]
+pub fn unsafe_path_reason(name: String) -> Option<ErrorDetail> {
+    match piesi_core::names::sanitize_rel_path(&name) {
+        Err(piesi_core::Error::UnsafePath(d)) => Some(d.into()),
+        _ => None,
     }
 }
 
