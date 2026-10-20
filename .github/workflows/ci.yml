@@ -32,6 +32,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: 安装 xcodegen
         run: brew install xcodegen
+      - name: 文案检查（没本地化的中文字面量、缺键、废键）
+        run: python3 apple/scripts/strings-lint.py
       - name: 构建核心 XCFramework
         run: scripts/build-core.sh
       - name: 生成并构建 Xcode 工程（不签名）
