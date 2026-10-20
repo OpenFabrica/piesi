@@ -17,7 +17,7 @@ use std::path::Path;
 use crate::archive::{ArchiveReader, Entry, EntryId, EntryKind, EntrySink, ExtractReport, Format, PasswordNeed};
 use crate::codec;
 use crate::progress::{OpContext, Throttle};
-use crate::{Error, Result};
+use crate::{DetailKind, Error, ErrorDetail, Result};
 
 /// 符号链接目标长度上限，超过它的 symlink 条目一定不正常。
 const MAX_SYMLINK_LEN: u64 = 64 * 1024;
@@ -54,7 +54,7 @@ impl ZipReader {
         let cd_size = eocd.cd_size;
         let mut cd_start = resolve(&source.disk_base, eocd.cd_disk, eocd.cd_offset)?;
         if cd_start.checked_add(cd_size).is_none_or(|end| end > len) {
-            return Err(Error::Corrupt("中央目录越界".into()));
+            return Err(Error::Corrupt(DetailKind::CdOutOfRange.into()));
         }
 
         // 前缀修正（仅单盘）：自解压程序 stub 或别的垃圾前缀会让包里所有偏移整体偏小。
@@ -77,10 +77,10 @@ impl ZipReader {
         let (entries, raws) = cd::parse_cd(&mut source.reader, cd_size, eocd.entries, |d, o| {
             resolve(&source.disk_base, d, o)?
                 .checked_add(delta)
-                .ok_or_else(|| Error::Corrupt("偏移溢出".into()))
+                .ok_or_else(|| Error::Corrupt(DetailKind::OffsetOverflow.into()))
         })?;
         if entries.is_empty() && eocd.entries != 0 {
-            return Err(Error::Corrupt("中央目录位置不对，读不到任何条目".into()));
+            return Err(Error::Corrupt(DetailKind::CdMisplaced.into()));
         }
         Ok(Self { source, entries, raws, comment: eocd.comment, password: None })
     }
@@ -95,8 +95,8 @@ impl ZipReader {
 fn resolve(disk_base: &[u64], disk: u32, offset: u64) -> Result<u64> {
     let base = disk_base
         .get(disk as usize)
-        .ok_or_else(|| Error::Corrupt(format!("引用了不存在的分卷 #{disk}")))?;
-    base.checked_add(offset).ok_or_else(|| Error::Corrupt("偏移溢出".into()))
+        .ok_or_else(|| Error::Corrupt(ErrorDetail::with(DetailKind::DiskMissing, disk)))?;
+    base.checked_add(offset).ok_or_else(|| Error::Corrupt(DetailKind::OffsetOverflow.into()))
 }
 
 /// `pos` 处的 4 字节是否等于 `sig`；读不到就当不是。
@@ -204,7 +204,7 @@ impl Read for EntryReader<'_, '_> {
 fn classify_io(e: io::Error) -> Error {
     use io::ErrorKind::*;
     match e.kind() {
-        InvalidData | InvalidInput | UnexpectedEof | Other | OutOfMemory => Error::Corrupt(format!("解压失败：{e}")),
+        InvalidData | InvalidInput | UnexpectedEof | Other | OutOfMemory => Error::Corrupt(ErrorDetail::with(DetailKind::DecompressFailed, e)),
         _ => Error::Io(e),
     }
 }
@@ -224,7 +224,7 @@ fn process_entry<T>(
     let (lh, data_start) = local::read_local_header(&mut source.reader, raw.local_offset, len)?;
     let packed = entry.packed_size.unwrap_or(0);
     if data_start.checked_add(packed).is_none_or(|end| end > len) {
-        return Err(Error::Corrupt(format!("条目数据越界：{name}")));
+        return Err(Error::Corrupt(ErrorDetail::with(DetailKind::EntryDataOutOfRange, name)));
     }
     source.reader.seek(SeekFrom::Start(data_start))?;
     let raw_reader = BufReader::with_capacity(RAW_BUF, (&mut source.reader).take(packed));
@@ -232,10 +232,10 @@ fn process_entry<T>(
     let mut dec = if entry.encrypted {
         let pw = password.ok_or(Error::PasswordRequired)?.as_bytes();
         if raw.flags & 0x0040 != 0 {
-            return Err(Error::Unsupported("PKWARE 强加密".into()));
+            return Err(Error::Unsupported(DetailKind::PkwareStrongEncryption.into()));
         }
         if raw.method_raw == 99 {
-            let info = raw.aes.as_ref().ok_or_else(|| Error::Corrupt("AES 条目缺少 0x9901 扩展字段".into()))?;
+            let info = raw.aes.as_ref().ok_or_else(|| Error::Corrupt(DetailKind::AesExtraMissing.into()))?;
             Decrypt::Aes(Box::new(aes::AesReader::new(raw_reader, pw, info, packed)?))
         } else {
             // 校验字节：正常是 CRC 高字节；有 data descriptor 时写入方还不知道 CRC，用的是 DOS 时间高字节
@@ -267,12 +267,12 @@ fn process_entry<T>(
     let value = result?;
     if outcome.remaining > 0 {
         if outcome.hit_eof {
-            return Err(Error::Corrupt(format!("数据提前结束：{name}")));
+            return Err(Error::Corrupt(ErrorDetail::with(DetailKind::DataTruncated, name)));
         }
         // 接收端没读完就返回了（它自己决定跳过），没法校验 CRC；AES 认证码照验
     } else if let Some(expected) = entry.crc32 {
         if outcome.crc != expected {
-            return Err(Error::Corrupt(format!("CRC 不匹配：{name}（期望 {expected:08x}，实际 {:08x}）", outcome.crc)));
+            return Err(Error::Corrupt(ErrorDetail::with_args(DetailKind::CrcMismatch, [name.to_string(), format!("{expected:08x}"), format!("{:08x}", outcome.crc)])));
         }
     }
     dec.finish()?;
@@ -323,7 +323,7 @@ impl ArchiveReader for ZipReader {
                 EntryKind::Dir => sink.dir(entry)?,
                 EntryKind::Symlink => {
                     if entry.size > MAX_SYMLINK_LEN {
-                        return Err(Error::Corrupt(format!("符号链接目标过长：{}", display_name(entry))));
+                        return Err(Error::Corrupt(ErrorDetail::with(DetailKind::SymlinkTargetTooLong, display_name(entry))));
                     }
                     let target = process_entry(&mut self.source, entry, raw, password, &mut th, |er| {
                         let mut v = Vec::with_capacity(entry.size as usize);

@@ -130,7 +130,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController, NSO
             }
             logger.notice("preview \(url.lastPathComponent, privacy: .public): \(loaded.format, privacy: .public) \(loaded.entryCount) 项")
         } catch {
-            header.stringValue = String(localized: "无法读取压缩包：\(error.localizedDescription)")
+            // 核心错误按界面语言翻译（CoreErrorText.swift）；别的错误才用系统描述
+            let reason = (error as? PiesiError)?.localizedText ?? error.localizedDescription
+            header.stringValue = String(localized: "无法读取压缩包：\(reason)")
             logger.error("preview \(url.lastPathComponent, privacy: .public) failed: \(String(describing: error), privacy: .public)")
         }
     }

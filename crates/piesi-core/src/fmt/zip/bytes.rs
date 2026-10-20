@@ -1,6 +1,6 @@
 //! 小端字节游标：所有从压缩包读出来的定长字段都经它取，越界一律返回 `Corrupt`，永不 panic。
 
-use crate::{Error, Result};
+use crate::{DetailKind, Error, Result};
 
 /// 只读游标，按小端读定长整数与定长切片。
 pub struct Cursor<'a> {
@@ -62,7 +62,7 @@ impl<'a> Cursor<'a> {
 
 /// 统一的「字段越界」错误。
 fn short() -> Error {
-    Error::Corrupt("记录不完整".into())
+    Error::Corrupt(DetailKind::RecordTruncated.into())
 }
 
 /// 小端读 u16（已知切片足够长时用，长度不足返回 None）。

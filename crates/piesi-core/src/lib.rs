@@ -4,6 +4,7 @@
 pub mod archive;
 pub mod codec;
 pub mod create;
+pub mod detail;
 pub mod encoding;
 pub mod error;
 pub mod facade;
@@ -17,6 +18,7 @@ pub mod volumes;
 pub mod warning;
 
 pub use archive::{ArchiveReader, Entry, EntryId, EntryKind, Format, IndexState, Method, PasswordNeed};
+pub use detail::{DetailKind, ErrorDetail};
 pub use error::{Error, Result};
 pub use progress::{CancelToken, OpContext, Progress, ProgressEvent};
 pub use warning::{Warning, WarningKind};

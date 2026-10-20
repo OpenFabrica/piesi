@@ -44,6 +44,8 @@ targets:
       Release: Config/Version.xcconfig
     sources:
       - path: Piesi
+      # 和 Quick Look 扩展共用的代码（核心错误的本地化文案）
+      - path: Shared
       # uniffi 生成的 Swift 绑定，scripts/build-core.sh 产出
       - path: Generated/piesi_ffi.swift
     dependencies:
@@ -69,6 +71,7 @@ targets:
       Release: Config/Version.xcconfig
     sources:
       - path: PiesiQuickLook
+      - path: Shared
       - path: Generated/piesi_ffi.swift
     dependencies:
       - framework: PiesiCore.xcframework

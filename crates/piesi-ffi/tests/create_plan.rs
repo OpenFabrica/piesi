@@ -158,7 +158,24 @@ fn verify_detects_corruption() {
     fs::write(&dest, &bytes).unwrap();
     let archive = open_archive(dest.to_string_lossy().into_owned(), None).unwrap();
     let err = archive.verify(vec![], Arc::new(Quiet), CancelHandle::new()).unwrap_err();
-    // CRC 对不上归为「压缩包损坏」，壳层据此给本地化标题
-    assert!(matches!(err, piesi_ffi::PiesiError::Corrupt { .. }), "损坏应报 Corrupt：{err:?}");
+    // CRC 对不上归为「压缩包损坏」，细节是结构化的 CrcMismatch（条目名、期望值、实际值），壳层据此拼本地化句子
+    match &err {
+        piesi_ffi::PiesiError::Corrupt { detail } => {
+            assert_eq!(detail.kind, piesi_ffi::DetailKind::CrcMismatch, "{err:?}");
+            assert_eq!(detail.args.len(), 3, "{err:?}");
+        }
+        other => panic!("损坏应报 Corrupt：{other:?}"),
+    }
     fs::remove_dir_all(&dir).unwrap();
+}
+
+/// 不安全路径的原因是结构化的（壳层用它翻译 UnsafePathSkipped 警告）；安全的名字返回 None。
+#[test]
+fn unsafe_path_reason_is_structured() {
+    let d = piesi_ffi::unsafe_path_reason("../etc/passwd".into()).expect("`..` 应判为不安全");
+    assert_eq!(d.kind, piesi_ffi::DetailKind::PathDotComponent);
+    assert_eq!(d.args, vec!["..".to_owned(), "../etc/passwd".to_owned()]);
+    assert_eq!(d.to_string(), "路径含 `..` 分量：../etc/passwd");
+    assert_eq!(piesi_ffi::unsafe_path_reason("/abs".into()).map(|d| d.kind), Some(piesi_ffi::DetailKind::PathAbsolute));
+    assert!(piesi_ffi::unsafe_path_reason("a/b.txt".into()).is_none());
 }

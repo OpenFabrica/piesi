@@ -50,7 +50,7 @@ pub fn write_tar(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
             enc.multithread(threads).map_err(Error::other)?;
             Box::new(enc)
         }
-        other => return Err(Error::Unsupported(format!("{other:?} 不是 tar 格式"))),
+        other => return Err(Error::Unsupported(crate::ErrorDetail::with(crate::DetailKind::NotTarFormat, format!("{other:?}")))),
     };
     let mut builder = tar::Builder::new(encoder);
     builder.follow_symlinks(false);

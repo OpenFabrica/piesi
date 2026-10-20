@@ -17,6 +17,7 @@ use super::tar::{progress_name, selection_mask, CountingReader, WriterSink};
 use crate::archive::{ArchiveReader, Entry, EntryId, EntryKind, EntrySink, ExtractReport, Format, Method, PasswordNeed};
 use crate::progress::{CancelToken, OpContext, Throttle};
 use crate::warning::{Warning, WarningKind};
+use crate::{DetailKind, ErrorDetail};
 use crate::{Error, Result};
 
 /// 回调里把 unrar 吐出的数据切成这么大的块再过通道，限制通道占用的内存。
@@ -275,7 +276,7 @@ fn consume(rx: &Receiver<Msg>, entries: &[Entry], kinds: &[RarKind], sink: &mut 
         let msg = rx.recv().map_err(|_| Error::Other("unrar 工作线程意外退出".into()))?;
         match msg {
             Msg::Meta(i) => {
-                let entry = entries.get(i).ok_or_else(|| Error::Corrupt("条目序号越界".into()))?;
+                let entry = entries.get(i).ok_or_else(|| Error::Corrupt(DetailKind::EntryIndexOutOfRange.into()))?;
                 throttle.begin_entry(&progress_name(entry))?;
                 match kinds[i] {
                     RarKind::Dir => {
@@ -301,7 +302,7 @@ fn consume(rx: &Receiver<Msg>, entries: &[Entry], kinds: &[RarKind], sink: &mut 
                 }
             }
             Msg::Link(i, target) => {
-                let entry = entries.get(i).ok_or_else(|| Error::Corrupt("条目序号越界".into()))?;
+                let entry = entries.get(i).ok_or_else(|| Error::Corrupt(DetailKind::EntryIndexOutOfRange.into()))?;
                 throttle.begin_entry(&progress_name(entry))?;
                 match target {
                     Some(target) => {
@@ -315,14 +316,14 @@ fn consume(rx: &Receiver<Msg>, entries: &[Entry], kinds: &[RarKind], sink: &mut 
                 }
             }
             Msg::Begin(i) => {
-                let entry = entries.get(i).ok_or_else(|| Error::Corrupt("条目序号越界".into()))?;
+                let entry = entries.get(i).ok_or_else(|| Error::Corrupt(DetailKind::EntryIndexOutOfRange.into()))?;
                 throttle.begin_entry(&progress_name(entry))?;
                 let mut chan = ChannelReader { rx, index: i, pending: None, done: None };
                 let mut counting = CountingReader::new(&mut chan, &mut *throttle);
                 let delivered = sink.file(entry, &mut counting).map(|_| ());
                 // 先把通道里这个条目剩下的数据吃完，保证下一条消息对齐
                 let _ = counting.drain();
-                let on_inner = |m: String| if entry.encrypted { Error::WrongPassword } else { Error::Corrupt(m) };
+                let on_inner = |m: String| if entry.encrypted { Error::WrongPassword } else { Error::corrupt(m) };
                 counting.finish(delivered, on_inner)?;
                 match chan.done.take() {
                     Some(Ok(())) => report.extracted += 1,
@@ -803,19 +804,22 @@ fn map_code(code: RarCode, stage: Stage, encrypted_with_password: bool) -> Error
         RarCode::MissingPassword => Error::PasswordRequired,
         RarCode::BadPassword => Error::WrongPassword,
         RarCode::BadData if encrypted_with_password => Error::WrongPassword,
-        RarCode::BadData => Error::Corrupt(match stage {
-            Stage::Open => "RAR 压缩包头损坏".into(),
-            Stage::Read => "RAR 文件头损坏".into(),
-            Stage::Process => "RAR 数据 CRC 校验失败".into(),
-        }),
-        RarCode::BadArchive => Error::Corrupt("不是 RAR 压缩包".into()),
-        RarCode::UnknownFormat => Error::Unsupported("RAR：未知的格式或加密方式".into()),
+        RarCode::BadData => Error::Corrupt(
+            match stage {
+                Stage::Open => DetailKind::RarArchiveHeaderBad,
+                Stage::Read => DetailKind::RarFileHeaderBad,
+                Stage::Process => DetailKind::RarCrcFailed,
+            }
+            .into(),
+        ),
+        RarCode::BadArchive => Error::Corrupt(DetailKind::NotRar.into()),
+        RarCode::UnknownFormat => Error::Unsupported(DetailKind::RarUnknownFormat.into()),
         RarCode::EOpen => match stage {
             Stage::Open => Error::Io(io::Error::new(io::ErrorKind::NotFound, "无法打开 RAR 压缩包")),
-            _ => Error::Corrupt("找不到下一个分卷".into()),
+            _ => Error::Corrupt(DetailKind::NextVolumeMissing.into()),
         },
-        RarCode::ERead => Error::Corrupt("RAR 读取错误".into()),
-        RarCode::EReference => Error::Unsupported("RAR 引用记录（-oi）需要完整解压".into()),
+        RarCode::ERead => Error::Corrupt(DetailKind::RarReadError.into()),
+        RarCode::EReference => Error::Unsupported(DetailKind::RarReference.into()),
         RarCode::NoMemory => Error::Other("unrar：内存不足".into()),
         RarCode::ECreate | RarCode::EClose | RarCode::EWrite => Error::Other(format!("unrar 写入错误：{code:?}")),
         RarCode::SmallBuf => Error::Other("unrar：缓冲区过小".into()),
@@ -838,7 +842,7 @@ impl Handle {
     /// 打开压缩包。密码既通过回调在打开时回答（RAR5 头加密需要），也在打开后用 RARSetPassword 设一次。
     /// `encrypted_with_password` 为真时打开阶段的 BadData 按密码错报。
     fn open(path: &Path, mode: u32, state: &mut CallbackState, encrypted_with_password: bool) -> Result<Opened> {
-        let narrow = CString::new(path.as_os_str().as_encoded_bytes()).map_err(|_| Error::UnsafePath(path.display().to_string()))?;
+        let narrow = CString::new(path.as_os_str().as_encoded_bytes()).map_err(|_| Error::UnsafePath(ErrorDetail::with(DetailKind::Plain, path.display())))?;
         let wide = to_wide(&path.to_string_lossy());
         let mut comment = vec![0 as sys::WCHAR; COMMENT_BUF];
         let password = state.password.clone();

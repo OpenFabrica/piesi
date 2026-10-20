@@ -141,7 +141,7 @@ pub fn plan_extract(entries: &[Entry], names: &[String], selected: Option<&[Entr
             Err(err) => {
                 // 不安全路径只留原因本身；别的错误带完整文案
                 let reason = match err {
-                    Error::UnsafePath(s) => s,
+                    Error::UnsafePath(d) => d.to_string(),
                     other => other.to_string(),
                 };
                 warnings.push(Warning::with_detail(WarningKind::UnsafePathSkipped, name, reason));

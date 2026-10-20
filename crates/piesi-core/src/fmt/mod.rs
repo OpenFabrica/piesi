@@ -18,6 +18,6 @@ pub fn open_with_format(path: &Path, format: Format) -> Result<Box<dyn ArchiveRe
         Format::SevenZ => Ok(Box::new(sevenz::SevenZReader::open(path)?)),
         Format::Rar => Ok(Box::new(rar::RarReader::open(path)?)),
         f if f.is_tar() || f.is_single_stream() => Ok(Box::new(tar::TarReader::open(path, f)?)),
-        f => Err(crate::Error::Unsupported(f.display_name().to_owned())),
+        f => Err(crate::Error::Unsupported(crate::ErrorDetail::with(crate::DetailKind::Plain, f.display_name()))),
     }
 }

@@ -12,7 +12,8 @@
 import json, pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-TARGETS = {"Piesi": ROOT / "Piesi", "PiesiQuickLook": ROOT / "PiesiQuickLook"}
+# target → (目录（含它的 Localizable.xcstrings）, 另外编进这个 target 的共享目录)
+TARGETS = {"Piesi": (ROOT / "Piesi", [ROOT / "Shared"]), "PiesiQuickLook": (ROOT / "PiesiQuickLook", [ROOT / "Shared"])}
 CJK = re.compile(r"[　-〿一-鿿＀-￯…]")
 
 def literals(code: str):
@@ -69,11 +70,12 @@ def key_pattern(literal: str) -> re.Pattern:
     parts.append("".join(cur))
     return re.compile("^" + r"%(?:\d\$)?(?:@|lld|llu|ld|d)".join(re.escape(p.replace("\\n", "\n")) for p in parts) + "$")
 
-def scan(target: str, src_dir: pathlib.Path):
+def scan(target: str, src_dir: pathlib.Path, shared: list):
+    """查一个 target：它自己的目录加共享目录里的 Swift，对照它自己的字符串目录。"""
     catalog_path = src_dir / "Localizable.xcstrings"
     keys = set(json.loads(catalog_path.read_text(encoding="utf-8"))["strings"]) if catalog_path.exists() else set()
     used, problems = set(), []
-    for path in sorted(src_dir.rglob("*.swift")):
+    for path in sorted(p for d in [src_dir, *shared] for p in d.rglob("*.swift")):
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if IGNORE_MARK in line:
                 continue
@@ -98,8 +100,8 @@ def scan(target: str, src_dir: pathlib.Path):
 
 def main() -> int:
     bad = 0
-    for target, src_dir in TARGETS.items():
-        problems = scan(target, src_dir)
+    for target, (src_dir, shared) in TARGETS.items():
+        problems = scan(target, src_dir, shared)
         print(f"== {target}: {len(problems)} 条")
         for p in problems:
             print("  " + p)
