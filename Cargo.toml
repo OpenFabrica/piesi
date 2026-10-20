@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/piesi-core", "crates/piesi-ffi", "crates/piesi-cli"]
 
 [workspace.package]
-version = "0.1.0-dev"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
