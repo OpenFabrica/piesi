@@ -7,7 +7,7 @@ Rust 核心可跨平台，开源（MIT OR Apache-2.0）。
 - 开发规则：`CLAUDE.md`
 - 发版规范：`docs/release.md`
 
-## 现状（P1 进行中）
+## 现状（v1.0 功能已齐，待发版）
 
 核心引擎已可用，命令行 `piesi` 可以：
 
@@ -25,7 +25,8 @@ piesi a 输出.7z --level 7 目录      # 创建 7z（多线程 LZMA2，solid �
 piesi a 输出.tar.zst 目录           # tar.gz / tar.xz / tar.zst
 ```
 
-Quick Look 扩展已可用：在 Finder 里按空格预览 zip / 7z / rar / tar 的条目树（只读索引，不解压）。macOS app 的解压流程、浏览窗口、Finder 右键 Services 正在做。
+macOS app（`apple/`）：双击压缩包直接解压到旁边（⌥ 双击或 Finder 右键「用 Piesi 查看」进浏览窗口）、浏览窗口（搜索、Quick Look、拖出、校验、编码切换）、压缩对话框（发给 Windows / 最小体积 / 加密 / Mac 专用四个预设）、设置、Finder 右键 Services、设为默认解压工具、快捷指令（App Intents：「用 Piesi 解压」「用 Piesi 压缩」）。界面有简体中文、繁体中文、English、日本語，其它语言回落到英文。
+Quick Look 扩展：在 Finder 里按空格预览 zip / 7z / rar / tar 的条目树（只读索引，不解压）。
 
 支持读取：zip（zip64、AES、ZipCrypto、`.zip.001`、`.z01` 分卷）、7z（BCJ/BCJ2/ARM64、solid、头加密、`.7z.001`）、rar（v4/v5、分卷、加密）、tar 及 tar.gz/bz2/xz/zst、单文件 gz/bz2/xz/zst。
 支持创建：zip（可 AES-256 加密）、7z（可 AES-256 加密、加密文件名）、tar.gz、tar.xz、tar.zst。macOS app 与 Quick Look 扩展在 `apple/`。
