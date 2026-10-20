@@ -45,19 +45,23 @@ fi
 scripts/build-core.sh
 ( cd apple && xcodegen generate )
 rm -rf "$DIST" && mkdir -p "$DIST"
+# CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO：xcodebuild build 默认给产物注入调试用的 get-task-allow，公证会拒；
+# 下面重签保留 entitlements，所以要在这里就不让它进去
 xcodebuild -project apple/Piesi.xcodeproj -scheme Piesi -configuration Release \
   -derivedDataPath apple/build \
   CODE_SIGN_IDENTITY="$IDENTITY" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=HQ537XMLJY \
+  CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
   OTHER_CODE_SIGN_FLAGS="--timestamp" PIESI_GIT_HASH="$GIT_HASH" \
   build
 APP=$(find apple/build/Build/Products/Release -maxdepth 1 -name "Piesi.app" | head -1)
 [ -n "$APP" ] || { echo "找不到 Piesi.app" >&2; exit 1; }
 
-# 深度签名：先扩展后主 app（嵌套的 appex 必须先签），都带 hardened runtime 与时间戳
+# 深度签名：先扩展后主 app（嵌套的 appex 必须先签），都带 hardened runtime 与时间戳。
+# 必须保留 Xcode 签进去的 entitlements：重签不带它会被清空，appex 没了沙盒系统就不加载，App Group 交接也会断
 find "$APP/Contents/PlugIns" -name "*.appex" -maxdepth 1 2>/dev/null | while read -r appex; do
-  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$appex"
+  codesign --force --options runtime --timestamp --preserve-metadata=entitlements --sign "$IDENTITY" "$appex"
 done
-codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+codesign --force --options runtime --timestamp --preserve-metadata=entitlements --sign "$IDENTITY" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 DMG="$DIST/Piesi-$PKG_VER.dmg"

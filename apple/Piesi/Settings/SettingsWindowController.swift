@@ -1,4 +1,4 @@
-// SettingsWindowController.swift —— 设置窗口（⌘,）：默认动作、完成后动作、自动退出、设为默认解压工具。存 UserDefaults。
+// SettingsWindowController.swift —— 设置窗口（⌘,）：默认动作、完成后动作、自动退出、设为默认解压工具、Finder 右键菜单开关入口、界面语言入口。存 UserDefaults。
 import AppKit
 import SwiftUI
 
@@ -10,7 +10,7 @@ final class SettingsWindowController: NSWindowController {
         // grouped 风格的 Form 没有固有高度，窗口尺寸由这里定，不让 SwiftUI 反推
         hosting.sizingOptions = []
         let window = NSWindow(contentViewController: hosting)
-        window.setContentSize(NSSize(width: 480, height: 470))
+        window.setContentSize(NSSize(width: 480, height: 610))
         window.title = String(localized: "设置")
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
@@ -36,10 +36,12 @@ final class SettingsWindowController: NSWindowController {
 /// 设置页。@AppStorage 直接读写 AppSettings 注册过默认值的那些键。
 struct SettingsView: View {
     @AppStorage(SettingsKey.defaultAction) private var defaultAction = DefaultAction.extract.rawValue
-    @AppStorage(SettingsKey.revealInFinder) private var revealInFinder = false
+    @AppStorage(SettingsKey.revealInFinder) private var revealInFinder = true
     @AppStorage(SettingsKey.moveToTrash) private var moveToTrash = false
     @AppStorage(SettingsKey.autoQuit) private var autoQuit = true
     @State private var settingDefault = false
+    /// Finder 右键菜单扩展是否已在系统设置里打开；打开设置页、回到 app 时重读
+    @State private var finderMenuEnabled = false
 
     var body: some View {
         Form {
@@ -72,9 +74,55 @@ struct SettingsView: View {
                     }
                     .disabled(settingDefault)
                 }
+                // Finder Sync 扩展装上后要用户在系统设置里打开开关才生效，app 自己打不开它，只能带用户过去
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Finder 右键菜单")
+                        Group {
+                            if finderMenuEnabled {
+                                Text("已开启。右键菜单里直接有「用 Piesi 解压到此处」等命令。")
+                            } else {
+                                Text("未开启。在系统设置里打开 Piesi 的开关后，右键菜单里直接有 Piesi 的命令。")
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("打开扩展设置…") {
+                        FinderExtension.openSettings()
+                    }
+                }
+                // 界面语言跟随系统，不在 app 里自己切：改 AppleLanguages 要重启才生效，
+                // 而且 Quick Look 扩展不跟着变。这里只带用户去系统的「语言与地区」，在「应用程序」里单独给 Piesi 选语言。
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("界面语言")
+                        Text("跟随系统。可在「语言与地区」的「应用程序」里单独为 Piesi 选择语言。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("打开语言设置…") {
+                        SettingsView.openLanguageSettings()
+                    }
+                }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 470)
+        .frame(width: 480, height: 610)
+        .task {
+            finderMenuEnabled = await FinderExtension.isEnabled()
+        }
+        // 用户去系统设置拨完开关切回来时刷新
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { finderMenuEnabled = await FinderExtension.isEnabled() }
+        }
+    }
+
+    /// 打开系统设置的「语言与地区」面板。
+    static func openLanguageSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension") else { return }
+        NSWorkspace.shared.open(url)
     }
 }

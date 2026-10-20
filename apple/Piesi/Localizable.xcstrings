@@ -953,6 +953,34 @@
         }
       }
     },
+    "Finder 右键菜单": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finder Context Menu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finder のコンテキストメニュー"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finder 右键菜单"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finder 快速選單"
+          }
+        }
+      }
+    },
     "GB18030（简体中文）": {
       "localizations": {
         "en": {
@@ -3389,6 +3417,34 @@
         }
       }
     },
+    "可以新建「%@」放解出的文件，也可以直接解压到已有的「%@」里（遇到同名文件会再问）。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can create “%1$@” for the extracted files, or extract into the existing “%2$@” (you’ll be asked about files with the same name)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展開したファイル用に「%1$@」を作成するか、既存の「%2$@」に直接展開できます（同じ名前のファイルがあれば改めて確認します）。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可以新建「%1$@」放解出的文件，也可以直接解压到已有的「%2$@」里（遇到同名文件会再问）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可以新建「%1$@」放解出的檔案，也可以直接解壓縮到已有的「%2$@」裡（遇到同名檔案會再問）。"
+          }
+        }
+      }
+    },
     "同名文件已存在，将保存为「%@」": {
       "localizations": {
         "en": {
@@ -3469,6 +3525,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "含控制字元：%@"
+          }
+        }
+      }
+    },
+    "喜欢 Piesi？去 GitHub 给它点个 Star ⭐": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enjoying Piesi? Give it a Star on GitHub ⭐"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Piesi を気に入ったら GitHub で Star をお願いします ⭐"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "喜欢 Piesi？去 GitHub 给它点个 Star ⭐"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "喜歡 Piesi？去 GitHub 給它按個 Star ⭐"
           }
         }
       }
@@ -3921,6 +4005,34 @@
         }
       }
     },
+    "已开启。右键菜单里直接有「用 Piesi 解压到此处」等命令。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On. Commands like “Extract Here with Piesi” appear right in the context menu."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オン。「Piesi でここに展開」などのコマンドがコンテキストメニューに直接表示されます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已开启。右键菜单里直接有「用 Piesi 解压到此处」等命令。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已開啟。快速選單裡直接有「用 Piesi 解壓縮到這裡」等指令。"
+          }
+        }
+      }
+    },
     "已改名以兼容 Windows：%@ → %@": {
       "localizations": {
         "en": {
@@ -3945,6 +4057,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "已改名以相容 Windows：%1$@ → %2$@"
+          }
+        }
+      }
+    },
+    "已有名为「%@」的文件夹": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A Folder Named “%@” Already Exists"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」という名前のフォルダがすでにあります"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有名为「%@」的文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有名為「%@」的檔案夾"
           }
         }
       }
@@ -4225,6 +4365,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "開啟壓縮檔…"
+          }
+        }
+      }
+    },
+    "打开扩展设置…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Extension Settings…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拡張機能の設定を開く…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开扩展设置…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打開延伸功能設定…"
+          }
+        }
+      }
+    },
+    "打开语言设置…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Language Settings…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "言語設定を開く…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开语言设置…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打開語言設定…"
           }
         }
       }
@@ -4873,6 +5069,34 @@
         }
       }
     },
+    "新建「%@」": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を作成"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建「%@」"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建「%@」"
+          }
+        }
+      }
+    },
     "新建压缩包": {
       "localizations": {
         "en": {
@@ -5205,6 +5429,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "服務"
+          }
+        }
+      }
+    },
+    "未开启。在系统设置里打开 Piesi 的开关后，右键菜单里直接有 Piesi 的命令。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off. Turn on Piesi in System Settings to put its commands right in the context menu."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフ。システム設定で Piesi をオンにすると、コンテキストメニューに Piesi のコマンドが直接表示されます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未开启。在系统设置里打开 Piesi 的开关后，右键菜单里直接有 Piesi 的命令。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未開啟。在系統設定裡打開 Piesi 的開關後，快速選單裡直接有 Piesi 的指令。"
           }
         }
       }
@@ -5653,6 +5905,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "用 Piesi 解壓縮"
+          }
+        }
+      }
+    },
+    "界面语言": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表示言語"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "界面语言"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "介面語言"
           }
         }
       }
@@ -6385,6 +6665,34 @@
         }
       }
     },
+    "解压到「%@」": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extract into “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に展開"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压到「%@」"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解壓縮到「%@」"
+          }
+        }
+      }
+    },
     "解压到此处": {
       "localizations": {
         "en": {
@@ -6745,6 +7053,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "讀取檔案尾端失敗"
+          }
+        }
+      }
+    },
+    "跟随系统。可在「语言与地区」的「应用程序」里单独为 Piesi 选择语言。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follows the system. To pick a language just for Piesi, use Applications in Language & Region."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "システムに従います。Piesi だけ言語を変えるには、「言語と地域」の「アプリケーション」で設定します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随系统。可在「语言与地区」的「应用程序」里单独为 Piesi 选择语言。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟隨系統。可在「語言與地區」的「應用程式」裡單獨為 Piesi 選擇語言。"
           }
         }
       }

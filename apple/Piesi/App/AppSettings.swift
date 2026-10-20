@@ -42,11 +42,12 @@ struct CompressTestRequest: Sendable {
 final class AppSettings {
     private let defaults = UserDefaults.standard
 
-    /// 注册默认值：自动退出默认开，其余默认关（设计 6.3）。
+    /// 注册默认值：自动退出、解压后在 Finder 选中结果默认开，其余默认关（设计 6.3）。
     init() {
         defaults.register(defaults: [
             SettingsKey.defaultAction: DefaultAction.extract.rawValue,
             SettingsKey.autoQuit: true,
+            SettingsKey.revealInFinder: true,
         ])
     }
 

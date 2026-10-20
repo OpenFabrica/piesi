@@ -31,6 +31,9 @@ pub struct ExtractOptions {
     pub conflict: ConflictPolicy,
     /// 跳过 `__MACOSX`、`.DS_Store` 这类垃圾
     pub skip_junk: bool,
+    /// 全部解压时顶层文件夹（包里唯一的顶层目录，或智能建的 `<archive_stem>/`）在目标里已存在：
+    /// true = 解到已有的文件夹里（同名文件按 `conflict` 处理），false = 另建 `名字-2`、`名字-3`…
+    pub merge_into_existing: bool,
 }
 
 impl ExtractOptions {
@@ -43,6 +46,7 @@ impl ExtractOptions {
             smart_folder: true,
             conflict: ConflictPolicy::Rename,
             skip_junk: true,
+            merge_into_existing: false,
         }
     }
 }
@@ -82,6 +86,12 @@ pub struct ExtractPlan {
     pub conflicts: Vec<String>,
     pub warnings: Vec<Warning>,
     pub skipped_junk: u64,
+    /// 顶层文件夹在目标里已存在时，那个已有文件夹的名字（不管这次是合并还是另建，都报出来，UI 据此问用户）
+    pub existing_folder: Option<String>,
+    /// 不合并时会用的新文件夹名（`名字-2`…）；existing_folder 为 None 时也为 None
+    pub new_folder: Option<String>,
+    /// 解出来的顶层项目的完整路径，解压后在 Finder 里选中它们
+    pub top_level: Vec<PathBuf>,
     rel_by_id: HashMap<EntryId, String>,
 }
 
@@ -155,21 +165,42 @@ pub fn plan_extract(entries: &[Entry], names: &[String], selected: Option<&[Entr
         items.push(PlannedItem { id: e.id, rel, kind: e.kind });
     }
 
-    // 3. 智能建文件夹：只在全部解压时考虑；顶层不止一个项目，或唯一项目是文件，就套一层
+    // 3. 智能建文件夹：只在全部解压时考虑；顶层不止一个项目，或唯一项目是文件，就套一层。
+    //    顶层文件夹（自带的或套的）在目标里已有同名文件夹时，按 merge_into_existing 合并或另建 `名字-2`；
+    //    同名的是文件（不能合并）时直接另建，不报 existing_folder
     let mut root = opts.dest.clone();
+    let mut wrapped = false;
+    let mut existing_folder = None;
+    let mut new_folder = None;
     if selected.is_none() && opts.smart_folder {
         let tops: HashSet<&str> = items.iter().map(|i| i.rel.split('/').next().unwrap_or("")).collect();
         let single_dir = tops.len() == 1
             && items.iter().any(|i| i.kind == EntryKind::Dir && !i.rel.contains('/'))
             || (tops.len() == 1 && items.iter().all(|i| i.rel.contains('/')));
-        if !single_dir {
-            let mut folder = opts.archive_stem.clone();
-            if folder.is_empty() {
-                folder = "extracted".to_owned();
+        let folder = if single_dir {
+            tops.into_iter().next().unwrap_or_default().to_owned()
+        } else {
+            wrapped = true;
+            if opts.archive_stem.is_empty() { "extracted".to_owned() } else { opts.archive_stem.clone() }
+        };
+        let target = opts.dest.join(&folder);
+        let mut name = folder.clone();
+        if target.symlink_metadata().is_ok() {
+            let free = free_dir_name(&opts.dest, &folder);
+            if target.is_dir() {
+                existing_folder = Some(folder.clone());
+                new_folder = Some(free.clone());
             }
-            root = opts.dest.join(&folder);
-            if opts.conflict == ConflictPolicy::Rename && root.exists() {
-                root = free_path(&opts.dest, &folder, true);
+            if !(target.is_dir() && opts.merge_into_existing) {
+                name = free;
+            }
+        }
+        if wrapped {
+            root = opts.dest.join(&name);
+        } else if name != folder {
+            // 包里自带的顶层目录改名：每条路径的第一段换成新名字
+            for item in &mut items {
+                item.rel = format!("{name}{}", &item.rel[folder.len()..]);
             }
         }
     }
@@ -213,7 +244,18 @@ pub fn plan_extract(entries: &[Entry], names: &[String], selected: Option<&[Entr
         .map(|i| entries[i.id as usize].size)
         .sum();
     let rel_by_id = kept.iter().map(|i| (i.id, i.rel.clone())).collect();
-    Ok(ExtractPlan { root, items: kept, total_bytes, conflicts, warnings, skipped_junk, rel_by_id })
+    // 顶层项目：套了文件夹就是那个文件夹，否则是各条目路径的第一段（按出现顺序去重）
+    let top_level = if wrapped {
+        vec![root.clone()]
+    } else {
+        let mut seen = HashSet::new();
+        kept.iter()
+            .filter_map(|i| i.rel.split('/').next())
+            .filter(|t| seen.insert(t.to_string()))
+            .map(|t| root.join(t))
+            .collect()
+    };
+    Ok(ExtractPlan { root, items: kept, total_bytes, conflicts, warnings, skipped_junk, existing_folder, new_folder, top_level, rel_by_id })
 }
 
 /// 给路径最后一段加 ` (n)`，扩展名保留：`a/b.txt` → `a/b (2).txt`。
@@ -240,16 +282,15 @@ fn free_rel(root: &Path, rel: &str) -> String {
     with_suffix(rel, 10_000)
 }
 
-/// 在 `dir` 下找一个不存在的子路径名。
-fn free_path(dir: &Path, name: &str, is_dir: bool) -> PathBuf {
+/// 在 `dir` 下找一个不存在的文件夹名：`name-2`、`name-3`…（用户要的命名，和文件冲突的 ` (n)` 不同）。
+fn free_dir_name(dir: &Path, name: &str) -> String {
     for n in 2..10_000 {
-        let candidate = if is_dir { format!("{name} ({n})") } else { with_suffix(name, n) };
-        let p = dir.join(&candidate);
-        if p.symlink_metadata().is_err() {
-            return p;
+        let candidate = format!("{name}-{n}");
+        if dir.join(&candidate).symlink_metadata().is_err() {
+            return candidate;
         }
     }
-    dir.join(format!("{name} (10000)"))
+    format!("{name}-10000")
 }
 
 /// 把驱动的 `EntrySink` 调用按计划映射到 `FileSink`。
@@ -314,7 +355,7 @@ mod tests {
         let tmp = std::env::temp_dir().join(format!("piesi-plan-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
-        let opts = ExtractOptions { dest: tmp.clone(), archive_stem: "pkg".into(), smart_folder: true, conflict: ConflictPolicy::Rename, skip_junk: true };
+        let opts = ExtractOptions { dest: tmp.clone(), archive_stem: "pkg".into(), smart_folder: true, conflict: ConflictPolicy::Rename, skip_junk: true, merge_into_existing: false };
 
         let entries = vec![file(0, "a.txt", 1), file(1, "b.txt", 2), file(2, "__MACOSX/._a.txt", 3)];
         let names: Vec<String> = entries.iter().map(|e| String::from_utf8(e.raw_name.clone()).unwrap()).collect();
@@ -335,6 +376,54 @@ mod tests {
         std::fs::remove_dir_all(&tmp).unwrap();
     }
 
+    /// 顶层文件夹已存在：默认另建 `名字-2`（递增），合并时解进已有文件夹；顶层项目用来在 Finder 里选中。
+    #[test]
+    fn existing_top_folder() {
+        let tmp = std::env::temp_dir().join(format!("piesi-plan3-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("top")).unwrap();
+        std::fs::create_dir_all(tmp.join("top-2")).unwrap();
+        std::fs::write(tmp.join("top/a.txt"), b"old").unwrap();
+        let mut opts = ExtractOptions { dest: tmp.clone(), archive_stem: "pkg".into(), smart_folder: true, conflict: ConflictPolicy::Rename, skip_junk: true, merge_into_existing: false };
+
+        // 包里自带顶层目录 top/，top 和 top-2 都已存在 → 改成 top-3/
+        let entries = vec![dir(0, "top/"), file(1, "top/a.txt", 1)];
+        let names: Vec<String> = entries.iter().map(|e| String::from_utf8(e.raw_name.clone()).unwrap()).collect();
+        let plan = plan_extract(&entries, &names, None, &opts).unwrap();
+        assert_eq!(plan.existing_folder.as_deref(), Some("top"));
+        assert_eq!(plan.new_folder.as_deref(), Some("top-3"));
+        assert_eq!(plan.rel_of(1), Some("top-3/a.txt"));
+        assert!(plan.conflicts.is_empty());
+        assert_eq!(plan.top_level, vec![tmp.join("top-3")]);
+
+        // 合并 → 解进已有的 top/，a.txt 冲突按策略改名
+        opts.merge_into_existing = true;
+        let plan = plan_extract(&entries, &names, None, &opts).unwrap();
+        assert_eq!(plan.rel_of(1), Some("top/a (2).txt"));
+        assert_eq!(plan.conflicts, vec!["top/a.txt".to_string()]);
+        assert_eq!(plan.top_level, vec![tmp.join("top")]);
+
+        // 智能建的文件夹 pkg/ 已存在 → pkg-2/
+        std::fs::create_dir_all(tmp.join("pkg")).unwrap();
+        opts.merge_into_existing = false;
+        let entries = vec![file(0, "a.txt", 1), file(1, "b.txt", 1)];
+        let names: Vec<String> = entries.iter().map(|e| String::from_utf8(e.raw_name.clone()).unwrap()).collect();
+        let plan = plan_extract(&entries, &names, None, &opts).unwrap();
+        assert_eq!(plan.existing_folder.as_deref(), Some("pkg"));
+        assert_eq!(plan.root, tmp.join("pkg-2"));
+        assert_eq!(plan.top_level, vec![tmp.join("pkg-2")]);
+
+        // 同名的是文件：不能合并，直接另建，不问
+        std::fs::write(tmp.join("solo"), b"file").unwrap();
+        opts.merge_into_existing = true;
+        let entries = vec![dir(0, "solo/"), file(1, "solo/x.txt", 1)];
+        let names: Vec<String> = entries.iter().map(|e| String::from_utf8(e.raw_name.clone()).unwrap()).collect();
+        let plan = plan_extract(&entries, &names, None, &opts).unwrap();
+        assert_eq!(plan.existing_folder, None);
+        assert_eq!(plan.rel_of(1), Some("solo-2/x.txt"));
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
     /// 大小写冲突与已有文件冲突的改名。
     #[test]
     fn conflicts_rename() {
@@ -342,7 +431,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
         std::fs::write(tmp.join("x.txt"), b"old").unwrap();
-        let opts = ExtractOptions { dest: tmp.clone(), archive_stem: "pkg".into(), smart_folder: false, conflict: ConflictPolicy::Rename, skip_junk: true };
+        let opts = ExtractOptions { dest: tmp.clone(), archive_stem: "pkg".into(), smart_folder: false, conflict: ConflictPolicy::Rename, skip_junk: true, merge_into_existing: false };
         let entries = vec![file(0, "README", 1), file(1, "readme", 1), file(2, "x.txt", 1)];
         let names: Vec<String> = entries.iter().map(|e| String::from_utf8(e.raw_name.clone()).unwrap()).collect();
         let plan = plan_extract(&entries, &names, None, &opts).unwrap();

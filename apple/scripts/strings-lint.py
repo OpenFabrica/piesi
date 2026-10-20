@@ -13,7 +13,11 @@ import json, pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 # target → (目录（含它的 Localizable.xcstrings）, 另外编进这个 target 的共享目录)
-TARGETS = {"Piesi": (ROOT / "Piesi", [ROOT / "Shared"]), "PiesiQuickLook": (ROOT / "PiesiQuickLook", [ROOT / "Shared"])}
+TARGETS = {
+    "Piesi": (ROOT / "Piesi", [ROOT / "Shared"]),
+    "PiesiQuickLook": (ROOT / "PiesiQuickLook", [ROOT / "Shared"]),
+    "PiesiFinder": (ROOT / "PiesiFinder", []),
+}
 CJK = re.compile(r"[　-〿一-鿿＀-￯…]")
 
 def literals(code: str):

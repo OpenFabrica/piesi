@@ -33,10 +33,6 @@ struct MainView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Text(AppInfo.versionLine)
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
             dropZone
             HStack(spacing: 12) {
                 Button("打开压缩包…") {

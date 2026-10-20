@@ -54,12 +54,15 @@ targets:
       - path: Shared
       # uniffi 生成的 Swift 绑定，scripts/build-core.sh 产出
       - path: Generated/piesi_ffi.swift
+      # 和 Finder 右键菜单扩展的交接（请求格式、App Group 目录）
+      - path: PiesiFinder/FinderRequest.swift
     dependencies:
       # 静态库 xcframework：只链接不嵌入（里面没有动态库）
       - framework: PiesiCore.xcframework
         embed: false
-      # Quick Look 扩展随 app 一起打包到 PlugIns/
+      # Quick Look 扩展、Finder 右键菜单扩展随 app 一起打包到 PlugIns/
       - target: PiesiQuickLook
+      - target: PiesiFinder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.citrolabs.piesi
@@ -91,6 +94,23 @@ targets:
         PRODUCT_NAME: PiesiQuickLook
         INFOPLIST_FILE: PiesiQuickLook/Info.plist
         CODE_SIGN_ENTITLEMENTS: PiesiQuickLook/PiesiQuickLook.entitlements
+
+  # Finder 右键菜单扩展（Finder Sync）：沙盒、不链接核心，只把选中的文件和命令交给主 app
+  PiesiFinder:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "14.0"
+    configFiles:
+      Debug: Config/Version.xcconfig
+      Release: Config/Version.xcconfig
+    sources:
+      - path: PiesiFinder
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.citrolabs.piesi.findersync
+        PRODUCT_NAME: PiesiFinder
+        INFOPLIST_FILE: PiesiFinder/Info.plist
+        CODE_SIGN_ENTITLEMENTS: PiesiFinder/PiesiFinder.entitlements
 
 # 共享 scheme，xcodebuild -scheme Piesi 直接可用（不靠 Xcode GUI 自动生成）
 schemes:

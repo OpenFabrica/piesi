@@ -18,6 +18,8 @@ pub struct ExtractOutcome {
     pub root: PathBuf,
     pub skipped_junk: u64,
     pub conflicts: Vec<String>,
+    /// 解出来的顶层项目（见 ExtractPlan::top_level）
+    pub top_level: Vec<PathBuf>,
 }
 
 /// 已打开的压缩包。
@@ -148,7 +150,7 @@ impl Archive {
         report.skipped += fs_report.skipped;
         report.warnings.extend(fs_report.warnings);
         report.warnings.extend(plan.warnings.iter().cloned());
-        Ok(ExtractOutcome { report, root: plan.root.clone(), skipped_junk: plan.skipped_junk, conflicts: plan.conflicts.clone() })
+        Ok(ExtractOutcome { report, root: plan.root.clone(), skipped_junk: plan.skipped_junk, conflicts: plan.conflicts.clone(), top_level: plan.top_level.clone() })
     }
 
     /// 校验压缩包：把全部（或选中）条目解到丢弃式接收端，驱动照常走完解码和 CRC 校验，但不写盘。

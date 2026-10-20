@@ -73,11 +73,13 @@ fn create_then_plan_and_extract_zip() {
         conflict: Conflict::Rename,
         skip_junk: true,
         ids: vec![],
+        merge_into_existing: false,
     };
     let plan = archive.plan(extract_req.clone()).unwrap();
     assert!(Path::new(&plan.root).starts_with(&out), "根目录应在目标下：{}", plan.root);
     assert_eq!(plan.total_bytes, 10_005);
     assert!(plan.conflicts.is_empty());
+    assert_eq!(plan.existing_folder, None);
     assert!(plan.archive_bytes > 0);
     assert!(plan.entries >= 3, "至少 源/、中文.txt、子目录/、b.bin 中的 3 项，实际 {}", plan.entries);
 
@@ -86,14 +88,24 @@ fn create_then_plan_and_extract_zip() {
     assert!(!under.is_empty() && under.len() < archive.entry_count() as usize, "{under:?}");
     assert_eq!(archive.ids_under(String::new()).len(), archive.entry_count() as usize);
 
-    let result = archive.extract(extract_req, Arc::new(Quiet), CancelHandle::new()).unwrap();
+    let result = archive.extract(extract_req.clone(), Arc::new(Quiet), CancelHandle::new()).unwrap();
     assert_eq!(result.root, plan.root);
+    assert_eq!(result.top_level.len(), 1, "只有一个顶层项目：{:?}", result.top_level);
+    assert!(Path::new(&result.top_level[0]).exists());
     assert_eq!(find_file(&out, "中文.txt").unwrap(), b"hello");
     assert_eq!(find_file(&out, "b.bin").unwrap().len(), 10_000);
     assert!(find_file(&out, ".DS_Store").is_none());
 
+    // 再解一次：顶层文件夹已存在 → 报出来，默认另建「名字-2」
+    let again = archive.plan(extract_req.clone()).unwrap();
+    let existing = again.existing_folder.clone().expect("顶层文件夹已存在");
+    assert_eq!(again.new_folder, Some(format!("{existing}-2")));
+    assert!(again.conflicts.is_empty());
+    let merged = archive.plan(ExtractRequest { merge_into_existing: true, ..extract_req.clone() }).unwrap();
+    assert!(!merged.conflicts.is_empty(), "解进已有文件夹会有同名文件");
+
     // 空 dest = 压缩包所在目录
-    let beside = archive.plan(ExtractRequest { dest: String::new(), smart_folder: true, conflict: Conflict::Skip, skip_junk: true, ids: vec![] }).unwrap();
+    let beside = archive.plan(ExtractRequest { dest: String::new(), smart_folder: true, conflict: Conflict::Skip, skip_junk: true, ids: vec![], merge_into_existing: false }).unwrap();
     assert!(Path::new(&beside.root).starts_with(&dir));
     fs::remove_dir_all(&dir).unwrap();
 }

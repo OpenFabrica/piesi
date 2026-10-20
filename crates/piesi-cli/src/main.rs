@@ -287,6 +287,8 @@ fn main() -> anyhow::Result<()> {
             } else {
                 ConflictPolicy::Rename
             };
+            // 顶层文件夹已存在：--overwrite / --skip 照旧解进去，默认另建 `名字-2`
+            opts.merge_into_existing = overwrite || skip;
             let d = archive.detection();
             if d.ambiguous && encoding.is_none() {
                 eprintln!("提示：文件名编码不确定（当前按 {:?}），可用 --encoding 指定。", d.encoding);

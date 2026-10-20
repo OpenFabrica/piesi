@@ -7,7 +7,7 @@ version = "0.1.0-dev"
 edition = "2021"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/rambocode/piesi"
+repository = "https://github.com/OpenFabrica/piesi"
 
 # 所有依赖在这里锁版本；成员 crate 用 `dep.workspace = true` 引用
 [workspace.dependencies]

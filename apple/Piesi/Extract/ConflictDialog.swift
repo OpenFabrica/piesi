@@ -1,4 +1,4 @@
-// ConflictDialog.swift —— 目标里已有同名项目时问冲突策略：改名（默认）/ 覆盖 / 跳过。
+// ConflictDialog.swift —— 解压前的两个询问：顶层文件夹已存在时另建还是解进去；目标里已有同名文件时改名（默认）/ 覆盖 / 跳过。
 import AppKit
 
 /// 冲突策略对话框。
@@ -21,6 +21,31 @@ enum ConflictDialog {
         case .alertFirstButtonReturn: return .rename
         case .alertSecondButtonReturn: return .overwrite
         case .alertThirdButtonReturn: return .skip
+        default: return nil
+        }
+    }
+}
+
+/// 顶层文件夹（包里自带的或按包名建的）在目标里已存在时的询问。
+@MainActor
+enum ExistingFolderDialog {
+    /// 用户的选择：另建新文件夹 / 解进已有文件夹
+    enum Choice {
+        case newFolder, merge
+    }
+
+    /// 默认按钮是另建「名字-2」，已有文件不受影响；取消返回 nil。
+    static func ask(existing: String, newFolder: String, parent: NSWindow?) async -> Choice? {
+        Log.extract.notice("existing folder dialog: \(existing, privacy: .public) → \(newFolder, privacy: .public)")
+        let alert = NSAlert()
+        alert.messageText = String(localized: "已有名为「\(existing)」的文件夹")
+        alert.informativeText = String(localized: "可以新建「\(newFolder)」放解出的文件，也可以直接解压到已有的「\(existing)」里（遇到同名文件会再问）。")
+        alert.addButton(withTitle: String(localized: "新建「\(newFolder)」"))
+        alert.addButton(withTitle: String(localized: "解压到「\(existing)」"))
+        alert.addButton(withTitle: String(localized: "取消"))
+        switch await Alerts.present(alert, in: parent) {
+        case .alertFirstButtonReturn: return .newFolder
+        case .alertSecondButtonReturn: return .merge
         default: return nil
         }
     }

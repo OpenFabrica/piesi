@@ -67,8 +67,8 @@
 - 干净压缩：默认排除 `__MACOSX`、`.DS_Store`、`._*`、`Thumbs.db`、`desktop.ini`；写 UTF-8 + bit 11 + NFC。
 - 加密：ZIP AES-256（打开 ZipCrypto 包时提示不安全）；7z AES-256 + 可选加密文件名。已实现（2026-10-20）：zip 写 WinZip AE 格式（明文 <20 字节 AE-2 不写 CRC，其余 AE-1；每条目随机盐；目录条目不加密），与 7zz 双向互通；7z 加密与文件名加密早已实现。ZipCrypto 的「不安全」提示：核心给每个条目标 `weak_encryption`（加密但非 AES / 非 PKWARE 强加密），facade / FFI `has_weak_encryption()`，CLI `x` / `t` 打警告、`list --json` 带字段；UI 在要密码时据此提示。
 - 安全：cap-std 输出、zip-slip、符号链接逃逸、压缩炸弹预警、磁盘空间预检、quarantine 传播、255 字节文件名截断、大小写冲突预检。
-- 系统集成：设为默认解压工具、Finder 右键 Services（压缩 / 解压到此处 / 用 Piesi 查看）、拖到 Dock 图标、Shortcuts（App Intents）、Quick Look 扩展（只读索引）。
-- 冲突处理：覆盖 / 跳过 / 重命名 / 合并；智能建文件夹（包内多个顶层项才建）。
+- 系统集成：设为默认解压工具、Finder 右键菜单顶层命令（Finder Sync 扩展）与 Services（压缩 / 解压到此处 / 用 Piesi 查看）、拖到 Dock 图标、Shortcuts（App Intents）、Quick Look 扩展（只读索引）。
+- 冲突处理：覆盖 / 跳过 / 重命名 / 合并；智能建文件夹（包内多个顶层项才建）。顶层文件夹（包里自带的或按包名建的）已存在时，问「新建 `名字-2`（递增）」还是「解压到已有文件夹」（同名文件再按冲突策略问）；CLI 默认新建，`--overwrite` / `--skip` 照旧解进去。
 - CLI `piesi`（供自动化与语料回归测试）。
 - 本地化：zh-Hans、zh-Hant、en、ja。
 
@@ -90,7 +90,7 @@
 ```
 ┌───────────────────────────────┐   ┌──────────────────────────┐
 │ macOS app（SwiftUI + AppKit）  │   │ Windows app（WinUI 3）v2  │
-│ Quick Look 扩展 / Services     │   │ Explorer 右键扩展          │
+│ Quick Look / Finder 菜单扩展   │   │ Explorer 右键扩展          │
 └───────────────┬───────────────┘   └─────────────┬────────────┘
                 │ UniFFI（Swift）                  │ UniFFI（C#）
 ┌───────────────┴─────────────────────────────────┴────────────┐
@@ -185,16 +185,22 @@
 - 双击压缩包：**直接解压到压缩包旁边**，只显示一个小进度浮窗。例外：包加密 → 先要密码；编码置信度低 → 先弹带样本名的编码选择条；目标已存在 → 冲突策略。
 - 要浏览时：按住 ⌥ 双击（app 在 `application(_:open:)` 里读 `NSEvent.modifierFlags`）、Finder 右键「用 Piesi 查看」、或在 app 内 ⌘O 打开。设置里可把默认改成「先浏览」。
 - 评审意见（记录，不改决定）：评审建议默认先浏览，理由是 WinRAR/360/Bandizip 用户的肌肉记忆是双击开窗，且乱码要在解压前看到。已用「低置信度先弹编码条」覆盖后一点。
-- 解压到压缩包所在目录；智能建文件夹；完成后可选在 Finder 显示、可选移压缩包到废纸篓（默认关）。
+- 解压到压缩包所在目录；智能建文件夹；完成后在 Finder 里选中解出来的顶层项目（默认开，设置可关）、可选移压缩包到废纸篓（默认关）。版本号只在「关于 Piesi」里（`版本 0.1.0-dev (core 0.1.0-dev)`），主窗口不放。
 - 首次启动只问一件事：「设为默认解压工具」。
 
 ### 6.4 系统集成
 - 默认处理器：注册 zip/7z/rar/tar/gz/bz2/xz/zst 等 UTI；7z（`org.7-zip.7-zip-archive`）、rar（`com.rarlab.rar-archive`）、zst 系统没声明，放进 `UTImportedTypeDeclarations`；「设为默认」用 `NSWorkspace.setDefaultApplication(at:toOpen:)` 逐个 UTI 设置。
 - TCC：非沙盒 app 写 Desktop/Documents/Downloads 要在 Info.plist 写三个 `NS*FolderUsageDescription`，否则授权弹窗没有文字甚至静默拒绝。
 - CLI `piesi` 随 app 打包在 `Contents/MacOS/`，同 hardened runtime 签名、一起公证。
-- Finder 右键：`NSServices`（「用 Piesi 压缩」「用 Piesi 解压到此处」「用 Piesi 查看」）+ App Intents（可做 Quick Action）。
+- Finder 右键：`NSServices`（「用 Piesi 压缩」「用 Piesi 解压到此处」「用 Piesi 查看」，在「服务」二级菜单）+ App Intents（可做 Quick Action）+ Finder Sync 扩展（右键菜单顶层，见下）。
 - Quick Look 扩展：空格预览包内文件列表；appex 永远沙盒且内存受限，**只做索引不解压**，列表最多 1 万行；头加密的 7z 无法预览（不能要密码）。
-- 不用 FinderSync（为同步盘设计，不合适）。
+- Finder 右键菜单顶层（已实现，2026-10-20，`apple/PiesiFinder/`）：原先认为 Finder Sync 为同步盘设计、不用；后来要像 Gemini 那样把命令放在右键菜单顶层、带图标，只有 Finder Sync 能做到，于是改用。
+  - 菜单：选中的全是压缩包（按扩展名，类型表在扩展 Info.plist 的 `PiesiArchiveTypes`，与主 app 的 `CFBundleDocumentTypes` 保持一致）→「用 Piesi 解压到此处」，只选一个时再加「用 Piesi 查看」；否则 →「用 Piesi 压缩」。
+  - 监视范围：`/` 加所有已挂载的卷（只设 `/` 时 U 盘、磁盘映像里没有菜单，实测），插拔磁盘时更新；不设角标。
+  - Finder 在后台队列调 `menu(for:)`（实测），NSMenu 要切到主线程建。
+  - 交接：扩展沙盒，只把命令和路径写进 App Group（`$(DEVELOPMENT_TEAM).com.citrolabs.piesi`，团队 ID 开头，macOS 上不要描述文件）的 `FinderRequests/<UUID>.json`，再用 `piesi://finder?id=<UUID>` 拉起扩展所在的那份 app。链接不带路径：网页也能打开 `piesi://`，伪造的 id 找不到文件就忽略，app 按普通启动处理。主 app 取走即删，超过 1 小时没取的也清掉。
+  - 开关：扩展装上后要用户在「系统设置 → 通用 → 登录项与扩展 → 文件提供程序」里打开。设置页显示状态并给入口（`FIFinderSyncController.showExtensionManagementInterface()`）；状态用 `pluginkit -m -i …` 行首的 `+` 判断，因为 `FIFinderSyncController.isExtensionEnabled` 实测开关打开了也返回 false。
+  - 打包：`scripts/package.sh` 重签时要 `--preserve-metadata=entitlements`，否则 appex 的沙盒与 App Group 被清空，系统不加载扩展（Quick Look 扩展之前就因此丢了沙盒）。
 
 - App Intents（已实现，2026-10-20）：「用 Piesi 解压」「用 Piesi 压缩」两个意图（`apple/Piesi/Intents/Intents.swift`），走和双击 / 对话框相同的协调器；`openAppWhenRun = false`，后台拉起不抢前台，perform() 返回 2 秒后按自动退出规则退出。无参数启动的主窗口延后 300 ms 显示，避免被意图拉起时闪一下。Siri 短语在 `AppShortcuts.xcstrings`。
 
@@ -246,6 +252,7 @@ Piesi/
     Config/Version.xcconfig     MARKETING_VERSION + VERSION_SUFFIX（按发版规范）
     Piesi/                      SwiftUI app（Browser、ExtractSheet、EncodingPicker、Compress、Tasks、Settings、Services、Intents）
     PiesiQuickLook/             QLPreviewingController，只读索引
+    PiesiFinder/                Finder Sync 扩展：右键菜单顶层命令，经 App Group + piesi:// 交给主 app
     PiesiCore.xcframework       scripts/build-core.sh 产物（不入库）
     scripts/build-core.sh       编译 Rust（arm64 + x86_64）→ uniffi-bindgen + lipo → XCFramework
     scripts/package.sh          签名、公证、staple、出 DMG
