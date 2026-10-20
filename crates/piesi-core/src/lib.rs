@@ -14,10 +14,12 @@ pub mod plan;
 pub mod progress;
 pub mod sys;
 pub mod volumes;
+pub mod warning;
 
 pub use archive::{ArchiveReader, Entry, EntryId, EntryKind, Format, IndexState, Method, PasswordNeed};
 pub use error::{Error, Result};
 pub use progress::{CancelToken, OpContext, Progress, ProgressEvent};
+pub use warning::{Warning, WarningKind};
 
 use std::path::Path;
 

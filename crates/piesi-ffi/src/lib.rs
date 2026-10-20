@@ -9,7 +9,7 @@ use piesi_core::encoding::NameEncoding;
 use piesi_core::facade::Archive;
 use piesi_core::plan::{ConflictPolicy, ExtractOptions};
 use piesi_core::progress::{CancelToken, OpContext, Progress, ProgressEvent};
-use piesi_core::{EntryKind, PasswordNeed};
+use piesi_core::{EntryKind, PasswordNeed, Warning as CoreWarning, WarningKind as CoreWarningKind};
 
 uniffi::setup_scaffolding!();
 
@@ -25,31 +25,137 @@ pub fn detect_format_name(path: String) -> Option<String> {
     piesi_core::detect_format(Path::new(&path)).ok().flatten().map(|f| f.display_name().to_owned())
 }
 
-/// 跨语言错误。
+/// 跨语言错误。壳层按变体翻译标题；`detail` / `message` 是核心给的细节（第三方库文案、系统错误），原样附在后面。
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum PiesiError {
     #[error("无法识别的压缩格式")]
     UnknownFormat,
+    /// 格式认得出但功能不支持（某种压缩方法、RAR 引用记录等）
+    #[error("不支持：{detail}")]
+    Unsupported { detail: String },
+    /// 压缩包数据损坏或结构不一致
+    #[error("压缩包损坏：{detail}")]
+    Corrupt { detail: String },
     #[error("需要密码")]
     PasswordRequired,
     #[error("密码错误")]
     WrongPassword,
     #[error("已取消")]
     Cancelled,
+    /// 条目路径不安全（绝对路径、`..`、盘符等）
+    #[error("不安全的路径：{detail}")]
+    UnsafePath { detail: String },
+    /// 目标磁盘放不下
+    #[error("磁盘空间不足：需要 {needed} 字节，可用 {available} 字节")]
+    NoSpace { needed: u64, available: u64 },
+    /// 读写文件时的系统错误（message 是系统给的英文文案）
+    #[error("{message}")]
+    Io { message: String },
     #[error("{message}")]
     Other { message: String },
 }
 
 impl From<piesi_core::Error> for PiesiError {
     fn from(e: piesi_core::Error) -> Self {
+        use piesi_core::Error as E;
         match e {
-            piesi_core::Error::UnknownFormat => PiesiError::UnknownFormat,
-            piesi_core::Error::PasswordRequired => PiesiError::PasswordRequired,
-            piesi_core::Error::WrongPassword => PiesiError::WrongPassword,
-            piesi_core::Error::Cancelled => PiesiError::Cancelled,
+            E::UnknownFormat => PiesiError::UnknownFormat,
+            E::Unsupported(detail) => PiesiError::Unsupported { detail },
+            E::Corrupt(detail) => PiesiError::Corrupt { detail },
+            E::PasswordRequired => PiesiError::PasswordRequired,
+            E::WrongPassword => PiesiError::WrongPassword,
+            E::Cancelled => PiesiError::Cancelled,
+            E::UnsafePath(detail) => PiesiError::UnsafePath { detail },
+            E::NoSpace { needed, available } => PiesiError::NoSpace { needed, available },
+            E::Io(e) => PiesiError::Io { message: e.to_string() },
             other => PiesiError::Other { message: other.to_string() },
         }
     }
+}
+
+/// 警告类型，和核心的 `WarningKind` 一一对应；文案由壳层按类型本地化（见核心 `warning.rs` 每个变体的说明）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum WarningKind {
+    /// 条目路径不安全，解压计划跳过了它。subject = 条目名，detail = 原因
+    UnsafePathSkipped,
+    /// 同目录下两个名字只差大小写，后一个改了名。subject = 原名，detail = 新名
+    CaseConflictRenamed,
+    /// 硬链接暂不支持，已跳过。subject = 条目名
+    HardLinkSkipped,
+    /// 设备文件、管道等特殊条目，已跳过。subject = 条目名
+    SpecialEntrySkipped,
+    /// RAR 引用记录暂不支持，已跳过。subject = 条目名
+    RarReferenceSkipped,
+    /// 条目没有数据，已跳过。subject = 条目名
+    NoDataSkipped,
+    /// 符号链接指向目标目录之外，已跳过。subject = 条目名，detail = 链接目标
+    SymlinkEscapeSkipped,
+    /// unrar 拒绝还原符号链接，已跳过。subject = 条目名
+    RarSymlinkRejected,
+    /// 创建符号链接失败。subject = 条目名，detail = 系统错误
+    SymlinkCreateFailed,
+    /// RAR 跳过未选中条目时解码出错，已忽略。subject = 条目名，detail = unrar 错误码
+    RarSkipDecodeError,
+    /// 压缩时跳过了特殊文件。subject = 源路径
+    SpecialFileSkipped,
+    /// 「发给 Windows」改了名字。subject = 原名，detail = 新名
+    RenamedForWindows,
+    /// zip 不能加密文件名，只加密了内容
+    ZipCannotEncryptNames,
+    /// 读取 Mac 元数据失败。subject = 源路径，detail = 系统错误
+    MacMetadataReadFailed,
+    /// 资源分支超过 64 MB，已丢弃。subject = 源路径
+    MacResourceForkTooLarge,
+    /// 扩展属性放不进 AppleDouble，已丢弃。subject = 源路径，detail = 属性名
+    MacXattrTooLarge,
+    /// 扩展属性名太长，已丢弃。subject = 源路径，detail = 属性名
+    MacXattrNameTooLong,
+    /// Finder 信息不是 32 字节，已丢弃。subject = 源路径
+    MacFinderInfoInvalid,
+}
+
+impl From<CoreWarningKind> for WarningKind {
+    fn from(k: CoreWarningKind) -> Self {
+        match k {
+            CoreWarningKind::UnsafePathSkipped => WarningKind::UnsafePathSkipped,
+            CoreWarningKind::CaseConflictRenamed => WarningKind::CaseConflictRenamed,
+            CoreWarningKind::HardLinkSkipped => WarningKind::HardLinkSkipped,
+            CoreWarningKind::SpecialEntrySkipped => WarningKind::SpecialEntrySkipped,
+            CoreWarningKind::RarReferenceSkipped => WarningKind::RarReferenceSkipped,
+            CoreWarningKind::NoDataSkipped => WarningKind::NoDataSkipped,
+            CoreWarningKind::SymlinkEscapeSkipped => WarningKind::SymlinkEscapeSkipped,
+            CoreWarningKind::RarSymlinkRejected => WarningKind::RarSymlinkRejected,
+            CoreWarningKind::SymlinkCreateFailed => WarningKind::SymlinkCreateFailed,
+            CoreWarningKind::RarSkipDecodeError => WarningKind::RarSkipDecodeError,
+            CoreWarningKind::SpecialFileSkipped => WarningKind::SpecialFileSkipped,
+            CoreWarningKind::RenamedForWindows => WarningKind::RenamedForWindows,
+            CoreWarningKind::ZipCannotEncryptNames => WarningKind::ZipCannotEncryptNames,
+            CoreWarningKind::MacMetadataReadFailed => WarningKind::MacMetadataReadFailed,
+            CoreWarningKind::MacResourceForkTooLarge => WarningKind::MacResourceForkTooLarge,
+            CoreWarningKind::MacXattrTooLarge => WarningKind::MacXattrTooLarge,
+            CoreWarningKind::MacXattrNameTooLong => WarningKind::MacXattrNameTooLong,
+            CoreWarningKind::MacFinderInfoInvalid => WarningKind::MacFinderInfoInvalid,
+        }
+    }
+}
+
+/// 一条警告：类型 + 主体（哪个条目或文件）+ 细节（链接目标、新名、系统错误等，可空）。
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct Warning {
+    pub kind: WarningKind,
+    pub subject: String,
+    pub detail: String,
+}
+
+impl From<CoreWarning> for Warning {
+    fn from(w: CoreWarning) -> Self {
+        Warning { kind: w.kind.into(), subject: w.subject, detail: w.detail }
+    }
+}
+
+/// 核心的警告列表转成跨语言记录。
+fn convert_warnings(warnings: Vec<CoreWarning>) -> Vec<Warning> {
+    warnings.into_iter().map(Into::into).collect()
 }
 
 /// 文件名编码（和核心的 NameEncoding 一一对应）。
@@ -166,7 +272,7 @@ pub struct ExtractResult {
     pub extracted: u64,
     pub skipped: u64,
     pub skipped_junk: u64,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
 }
 
 /// 解压前的计划摘要：给确认对话框、磁盘空间预检、压缩炸弹预警用，不落盘。
@@ -182,7 +288,7 @@ pub struct ExtractPlanInfo {
     pub archive_bytes: u64,
     /// 目标里已存在、会按冲突策略处理的相对路径
     pub conflicts: Vec<String>,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
     pub skipped_junk: u64,
 }
 
@@ -192,7 +298,7 @@ pub struct VerifyResult {
     /// 校验过的条目数
     pub entries: u64,
     pub skipped: u64,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
 }
 
 /// 进度快照。
@@ -456,7 +562,7 @@ impl ArchiveHandle {
             extracted: outcome.report.extracted,
             skipped: outcome.report.skipped,
             skipped_junk: outcome.skipped_junk,
-            warnings: outcome.report.warnings,
+            warnings: convert_warnings(outcome.report.warnings),
         })
     }
 
@@ -473,7 +579,7 @@ impl ArchiveHandle {
             total_bytes: plan.total_bytes,
             archive_bytes,
             conflicts: plan.conflicts,
-            warnings: plan.warnings,
+            warnings: convert_warnings(plan.warnings),
             skipped_junk: plan.skipped_junk,
         })
     }
@@ -485,7 +591,7 @@ impl ArchiveHandle {
         let ctx = OpContext::new(&progress, &cancel.token);
         let selected = if ids.is_empty() { None } else { Some(ids.as_slice()) };
         let report = a.verify(selected, &ctx)?;
-        Ok(VerifyResult { entries: report.extracted, skipped: report.skipped, warnings: report.warnings })
+        Ok(VerifyResult { entries: report.extracted, skipped: report.skipped, warnings: convert_warnings(report.warnings) })
     }
 
     /// 把单个条目解到临时文件（Quick Look 预览用），返回临时文件路径。
@@ -579,7 +685,7 @@ pub struct CreateResult {
     pub input_bytes: u64,
     pub output_bytes: u64,
     pub skipped_junk: u64,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
 }
 
 /// 创建压缩包。长操作，调用方放后台线程；进度经 listener 节流回调，cancel 可中断。
@@ -606,7 +712,7 @@ pub fn create_archive(request: CreateRequest, listener: Arc<dyn ProgressListener
             input_bytes: report.input_bytes,
             output_bytes: report.output_bytes,
             skipped_junk: report.skipped_junk,
-            warnings: report.warnings,
+            warnings: convert_warnings(report.warnings),
         }),
         Err(e) => {
             let _ = std::fs::remove_file(dest);

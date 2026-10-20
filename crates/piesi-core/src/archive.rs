@@ -4,6 +4,7 @@
 use std::io::Read;
 
 use crate::progress::OpContext;
+use crate::warning::Warning;
 use crate::Result;
 
 /// 条目 id = 在 `entries` 数组里的下标，跨 FFI 只传这个 u32。
@@ -186,7 +187,7 @@ pub enum PasswordNeed {
 pub struct ExtractReport {
     pub extracted: u64,
     pub skipped: u64,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
 }
 
 /// 驱动把条目内容交给它。实现方负责决定落盘路径与安全检查，驱动只管按顺序吐数据。

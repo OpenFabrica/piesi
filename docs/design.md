@@ -158,6 +158,15 @@
 - zip 多文件并行压缩（每文件独立 deflate，worker = CPU 核数）；LZMA2 多线程在 Codec 层分块；字典按内存自动，默认上限 min(可用内存/4, 256 MB)；「极限」档先弹内存估算。
 - 全程流式，永不整包进内存；解压前预检磁盘空间。
 
+### 5.5 文案与本地化（核心侧已实现，2026-10-20）
+- 核心不产出成句的用户文案：警告是结构化的 `Warning { kind, subject, detail }`（`warning.rs`，18 种 `WarningKind`），错误是带变体的 `Error`。FFI 原样导出 `Warning` record 和 `WarningKind` enum；`PiesiError` 把常见错误分成独立变体（UnknownFormat / Unsupported / Corrupt / PasswordRequired / WrongPassword / Cancelled / UnsafePath / NoSpace / Io / Other）。
+- 壳层按 kind 和错误变体查本地化表拼句子（zh-Hans / zh-Hant / en / ja 各一份），`subject`（哪个文件）和 `detail`（链接目标、新名、系统错误）原样填进去。
+- CLI 用核心的 `Display`（中文）直接打印，`piesi` 本身不做多语言。
+- App 侧：代码里的文案字面量是简体原文，同时就是 String Catalog（`Localizable.xcstrings`、`InfoPlist.xcstrings`）的键；四种语言都明写在目录里。SwiftUI 的 `Text` / `Button` / `Toggle` 等拿字面量时自动当键，AppKit 侧（NSMenu、NSAlert、`stringValue`…）必须包 `String(localized:)`。核心错误 / 警告的句子在 `CoreText.swift` 里拼。
+- 回落语言是英文（`developmentLanguage: en`）：没覆盖的语言（德语、韩语…）看到英文而不是中文键；zh-CN → zh-Hans、zh-TW / zh-HK → zh-Hant（已用 `Bundle.preferredLocalizations` 验证）。
+- `apple/scripts/strings-lint.py` 找出没本地化的中文字面量、目录里缺的键和没人用的键；CI 和每次加文案后跑。
+- 已知取舍：`Corrupt` / `Unsupported` / `UnsafePath` 的 detail 是核心里的中文细节（如「7z：块与文件表对不上」），壳层只翻译标题。这些是罕见的技术信息，v1.0 不翻；要翻时把 detail 换成错误码即可，FFI 形状不变。
+
 ## 6. macOS 应用设计
 
 ### 6.1 窗口

@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 use crate::archive::{Entry, EntryId, EntryKind, EntrySink};
 use crate::fs::{FileSink, Meta};
 use crate::names;
-use crate::Result;
+use crate::warning::{Warning, WarningKind};
+use crate::{Error, Result};
 
 /// 目标位置已有同名文件时怎么办。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -79,7 +80,7 @@ pub struct ExtractPlan {
     pub total_bytes: u64,
     /// 目标里已存在、会被策略处理的路径
     pub conflicts: Vec<String>,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
     pub skipped_junk: u64,
     rel_by_id: HashMap<EntryId, String>,
 }
@@ -138,7 +139,12 @@ pub fn plan_extract(entries: &[Entry], names: &[String], selected: Option<&[Entr
         let rel = match names::sanitize_rel_path(name) {
             Ok(r) => r,
             Err(err) => {
-                warnings.push(format!("跳过条目 #{}：{err}", e.id));
+                // 不安全路径只留原因本身；别的错误带完整文案
+                let reason = match err {
+                    Error::UnsafePath(s) => s,
+                    other => other.to_string(),
+                };
+                warnings.push(Warning::with_detail(WarningKind::UnsafePathSkipped, name, reason));
                 continue;
             }
         };
@@ -177,7 +183,7 @@ pub fn plan_extract(entries: &[Entry], names: &[String], selected: Option<&[Entr
                 continue; // 两个目录合并即可
             }
             let renamed = with_suffix(&items[i].rel, 2);
-            warnings.push(format!("大小写冲突：{} 改名为 {}", items[i].rel, renamed));
+            warnings.push(Warning::with_detail(WarningKind::CaseConflictRenamed, items[i].rel.clone(), renamed.clone()));
             items[i].rel = renamed;
         } else {
             seen_lower.insert(key, i);

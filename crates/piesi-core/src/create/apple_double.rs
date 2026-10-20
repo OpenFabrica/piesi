@@ -25,6 +25,8 @@
 
 use std::path::Path;
 
+use crate::warning::{Warning, WarningKind};
+
 /// Finder Info 固定 32 字节。
 pub const FINDER_INFO_LEN: usize = 32;
 /// 单个 fork（一个 xattr 值或资源分支）超过这个大小就跳过并给 warning，防止把一个巨型资源分支整个读进内存。
@@ -135,7 +137,7 @@ pub fn encode(meta: &MacMetadata) -> Vec<u8> {
 /// 透明压缩的内部数据，写出去再写回会毁掉文件）；超过 `MAX_FORK_BYTES` 的单个 fork 跳过并记 warning。
 /// 文件系统不支持 xattr（ENOTSUP）当作没有元数据。非 macOS 永远返回空。
 #[cfg(target_os = "macos")]
-pub fn read(path: &Path, warnings: &mut Vec<String>) -> std::io::Result<MacMetadata> {
+pub fn read(path: &Path, warnings: &mut Vec<Warning>) -> std::io::Result<MacMetadata> {
     let mut meta = MacMetadata::default();
     let names = match sys::list(path) {
         Ok(n) => n,
@@ -150,14 +152,7 @@ pub fn read(path: &Path, warnings: &mut Vec<String>) -> std::io::Result<MacMetad
             Err(e) => Err(e),
         }
     };
-    let too_big = |name: &str, size: u64, warnings: &mut Vec<String>| -> bool {
-        if size > MAX_FORK_BYTES {
-            warnings.push(format!("跳过 {}：{name} 有 {size} 字节，超过 {} MB 上限", path.display(), MAX_FORK_BYTES >> 20));
-            true
-        } else {
-            false
-        }
-    };
+    let subject = || path.display().to_string();
     let mut header_len = ATTR_ENTRIES_OFFSET;
     let mut data_len: u64 = 0;
     for name in names {
@@ -168,12 +163,13 @@ pub fn read(path: &Path, warnings: &mut Vec<String>) -> std::io::Result<MacMetad
                         // 全 0 的 Finder Info 等于没有，ditto 解包时也会忽略
                         Ok(fi) if fi != [0; FINDER_INFO_LEN] => meta.finder_info = Some(fi),
                         Ok(_) => {}
-                        Err(_) => warnings.push(format!("跳过 {}：Finder 信息长度 {} 不是 32 字节", path.display(), v.len())),
+                        Err(_) => warnings.push(Warning::new(WarningKind::MacFinderInfoInvalid, subject())),
                     }
                 }
             }
             b"com.apple.ResourceFork" => {
-                if too_big("资源分支", sys::size(path, &name)?, warnings) {
+                if sys::size(path, &name)? > MAX_FORK_BYTES {
+                    warnings.push(Warning::new(WarningKind::MacResourceForkTooLarge, subject()));
                     continue;
                 }
                 if let Some(v) = fetch(&name)? {
@@ -184,17 +180,14 @@ pub fn read(path: &Path, warnings: &mut Vec<String>) -> std::io::Result<MacMetad
             _ => {
                 let display = String::from_utf8_lossy(&name).into_owned();
                 if name.len() + 1 > u8::MAX as usize {
-                    warnings.push(format!("跳过 {}：扩展属性名 {display} 太长", path.display()));
+                    warnings.push(Warning::with_detail(WarningKind::MacXattrNameTooLong, subject(), display));
                     continue;
                 }
                 let size = sys::size(path, &name)?;
-                if too_big(&format!("扩展属性 {display}"), size, warnings) {
-                    continue;
-                }
-                // 条目表有 64 KB 的硬上限，值区偏移是 u32：超了只能丢掉这个属性
+                // 单值超过 MAX_FORK_BYTES、条目表超 64 KB 硬上限、值区偏移超出 u32：都只能丢掉这个属性
                 let entry_len = attr_entry_len(name.len() + 1);
-                if header_len + entry_len > ATTR_MAX_HDR_SIZE || data_len + size > u32::MAX as u64 - ATTR_MAX_HDR_SIZE as u64 {
-                    warnings.push(format!("跳过 {}：扩展属性 {display} 放不进 AppleDouble（条目表 64 KB / 数据区 4 GB 上限）", path.display()));
+                if size > MAX_FORK_BYTES || header_len + entry_len > ATTR_MAX_HDR_SIZE || data_len + size > u32::MAX as u64 - ATTR_MAX_HDR_SIZE as u64 {
+                    warnings.push(Warning::with_detail(WarningKind::MacXattrTooLarge, subject(), display));
                     continue;
                 }
                 let Some(value) = fetch(&name)? else { continue };
@@ -211,7 +204,7 @@ pub fn read(path: &Path, warnings: &mut Vec<String>) -> std::io::Result<MacMetad
 
 /// 非 macOS 没有 Finder 信息和资源分支，「Mac 专用」预设不产生任何 `._` 条目。
 #[cfg(not(target_os = "macos"))]
-pub fn read(_path: &Path, _warnings: &mut Vec<String>) -> std::io::Result<MacMetadata> {
+pub fn read(_path: &Path, _warnings: &mut Vec<Warning>) -> std::io::Result<MacMetadata> {
     Ok(MacMetadata::default())
 }
 

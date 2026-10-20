@@ -11,7 +11,7 @@ use crate::error::{Error, Result};
 /// APFS 单个路径分量的上限：255 字节（不是字符）。
 pub const APFS_COMPONENT_MAX_BYTES: usize = 255;
 
-/// `windows_safe_name` 做过的改动，UI 用来向用户解释「名字为什么变了」。
+/// `windows_safe_name` 做过的改动。给用户看的提示走 `Warning::RenamedForWindows`（只带新旧名字），这里的原因明细供测试和日志核对。
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum NameWarning {
     /// 替换了 Windows 不允许的字符（`\ / : * ? " < > |` 与控制字符），附替换个数

@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use crate::archive::{ArchiveReader, Entry, EntryId, EntryKind, EntrySink, ExtractReport, Format, IndexState, Method};
 use crate::progress::{OpContext, Throttle};
+use crate::warning::{Warning, WarningKind};
 use crate::{Error, Result};
 
 /// 文件读缓冲大小：解码器一次喂 256 KB，减少系统调用。
@@ -93,11 +94,11 @@ impl TarReader {
                     report.extracted += 1;
                 }
                 TarKind::HardLink => {
-                    report.warnings.push(format!("{}：硬链接暂不支持，已跳过", progress_name(entry)));
+                    report.warnings.push(Warning::new(WarningKind::HardLinkSkipped, progress_name(entry)));
                     report.skipped += 1;
                 }
                 TarKind::Special => {
-                    report.warnings.push(format!("{}：设备文件或管道，已跳过", progress_name(entry)));
+                    report.warnings.push(Warning::new(WarningKind::SpecialEntrySkipped, progress_name(entry)));
                     report.skipped += 1;
                 }
                 TarKind::Regular => {

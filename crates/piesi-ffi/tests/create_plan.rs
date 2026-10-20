@@ -158,6 +158,7 @@ fn verify_detects_corruption() {
     fs::write(&dest, &bytes).unwrap();
     let archive = open_archive(dest.to_string_lossy().into_owned(), None).unwrap();
     let err = archive.verify(vec![], Arc::new(Quiet), CancelHandle::new()).unwrap_err();
-    assert!(matches!(err, piesi_ffi::PiesiError::Other { .. }), "损坏应报错：{err:?}");
+    // CRC 对不上归为「压缩包损坏」，壳层据此给本地化标题
+    assert!(matches!(err, piesi_ffi::PiesiError::Corrupt { .. }), "损坏应报 Corrupt：{err:?}");
     fs::remove_dir_all(&dir).unwrap();
 }
