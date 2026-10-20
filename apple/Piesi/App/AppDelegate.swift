@@ -4,11 +4,13 @@ import UniformTypeIdentifiers
 
 /// 应用委托。Finder 的 open 事件在 didFinishLaunching 之前就会到，所以先进队列，启动完成后再按设置处理。
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// 全局入口（NSApp.delegate 是弱引用，这里是强引用）
     static var shared: AppDelegate!
 
     let settings = AppSettings()
+    /// 自动更新（Sparkle）；didFinishLaunching 里启动
+    let updater = Updater()
     let taskCenter = TaskCenter()
     private(set) lazy var tasksWindow = TasksWindowController(center: taskCenter)
     private(set) lazy var extractor = ExtractCoordinator(taskCenter: taskCenter, settings: settings, tasksWindow: tasksWindow)
@@ -59,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settings.showSettingsAtLaunch {
             settingsWindow.show()
         }
+        updater.start()
         // 首次启动只问「设为默认解压工具」这一件事（设计 6.3），问完再处理排队的文件
         Task { @MainActor in
             await DefaultHandler.askOnFirstLaunch(settings: settings)
@@ -299,6 +302,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         link[.link] = AppInfo.xURL
         text.append(NSAttributedString(string: "X: @daveylan2", attributes: link))
         return text
+    }
+
+    /// 「检查更新…」：手动检查自动更新。
+    @objc func checkForUpdates(_ sender: Any?) {
+        updater.checkForUpdates()
+    }
+
+    /// 正在检查 / 下载更新时把「检查更新…」变灰，其余菜单项照常可用。
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(checkForUpdates(_:)) {
+            return updater.canCheckForUpdates
+        }
+        return true
     }
 
     /// ⌘,：设置窗口。

@@ -6,6 +6,7 @@
 #   APPSTORE_API_KEY_P8        App Store Connect API Key 的 .p8 文件内容
 #   APPSTORE_API_KEY_ID        Key ID
 #   APPSTORE_API_ISSUER        Issuer ID
+#   SPARKLE_ED_PRIVATE_KEY     自动更新的 EdDSA 私钥（Sparkle `generate_keys -x <文件>` 导出的那一行），给 appcast 签名
 name: release
 on:
   push:
@@ -53,9 +54,15 @@ jobs:
           API_KEY_P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
         run: printf '%s\n' "$API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
 
-      - name: 打包（门禁 → 构建 → 签名 → 公证 → staple）
+      - name: 写入 Sparkle 私钥
+        env:
+          SPARKLE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: printf '%s\n' "$SPARKLE_KEY" > "$RUNNER_TEMP/sparkle_ed_key"
+
+      - name: 打包（门禁 → 构建 → 签名 → 公证 → staple → appcast）
         env:
           RELEASE: "1"
+          SPARKLE_ED_KEY_FILE: ${{ runner.temp }}/sparkle_ed_key
           APPLE_NOTARY_KEY: ${{ runner.temp }}/AuthKey.p8
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           APPLE_NOTARY_ISSUER: ${{ secrets.APPSTORE_API_ISSUER }}
@@ -70,7 +77,10 @@ jobs:
       - name: 发布到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.dmg
+          # appcast.xml 每个 Release 都传一份：SUFeedURL 指 releases/latest/download/appcast.xml
+          files: |
+            dist/*.dmg
+            dist/appcast.xml
           body_path: ${{ runner.temp }}/notes.md
           # 标签带 alpha / beta / rc 这类后缀的标成预发布
           prerelease: ${{ contains(github.ref_name, '-') }}
@@ -78,5 +88,5 @@ jobs:
       - name: 清理钥匙串与密钥
         if: always()
         run: |
-          rm -f "$RUNNER_TEMP/AuthKey.p8"
+          rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/sparkle_ed_key"
           security delete-keychain "$RUNNER_TEMP/piesi.keychain-db" 2>/dev/null || true

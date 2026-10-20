@@ -211,6 +211,15 @@
 - Developer ID 签名 + 公证 + staple，按 `~/.claude/docs/apple-signing.md`（profile `aster-notary`）。
 - 发版规范按 `~/.claude/docs/release-versioning.md` 写进 `docs/release.md`（只写 Rust + Swift/Xcode 两行）。
 
+### 6.6 自动更新（2026-10-20）
+- 用 Sparkle 2（SPM 包，`project.yml` 锁 2.10.0）。只有 GitHub 直接分发的版本带它；将来上 Mac App Store 的版本要去掉。
+- 更新清单 `appcast.xml` 与 DMG 一起传到 GitHub Release，`SUFeedURL` 指 `https://github.com/OpenFabrica/piesi/releases/latest/download/appcast.xml`（「latest」不含预发布）。**仓库公开以前，外部下载不到 Release 资源，自动更新不起作用。**
+- 版本比较按 `CFBundleVersion`，它跟 `MARKETING_VERSION` 走（`Version.xcconfig`）：开发版 `0.1.1-dev` 的 CFBundleVersion 是 `0.1.1`，不会被提示「更新」到同号正式版。
+- 安全：DMG 用 EdDSA 签名，公钥写在 Info.plist 的 `SUPublicEDKey`；私钥在发版机的登录钥匙串（Sparkle `generate_keys` 生成，钥匙串项「Private key for signing Sparkle updates」），CI 用 Secret `SPARKLE_ED_PRIVATE_KEY`。私钥丢了老用户就再也收不到更新，要另外备份（`generate_keys -x <文件>` 导出）。Sparkle 还会核对新旧 app 的代码签名属于同一团队。
+- 行为：默认每天自动检查（`SUEnableAutomaticChecks`，不弹 Sparkle 的「要不要自动检查」询问——首启只问默认处理器一件事）；「自动下载并在退出时安装」默认关。菜单「Piesi → 检查更新…」，设置页「更新」一节有两个开关和「检查更新…」按钮。更新界面和文案用 Sparkle 自带的（含简繁中文、日文）。
+- 测试入口：`-PiesiFeedURL <地址>` 换清单地址，本地起 HTTP 服务器演练「发现 → 下载 → 校验 → 安装 → 重启」全流程。
+- 打包：`scripts/package.sh` 先把 Sparkle 框架里的 XPC 服务、Autoupdate、Updater.app 逐个用 Developer ID 重签（否则公证不过）；发版（`RELEASE=1`）或 `APPCAST=1` 时用 Sparkle 的 `generate_appcast` 给 DMG 签名并写 `dist/appcast.xml`，release.yml 把它和 DMG 一起传到 Release。
+
 ## 7. 开源与分发（用户已定：开源）
 
 - 代码开源，放 GitHub。许可：`piesi-core` 与 app 用 **MIT OR Apache-2.0**（和 Rust 生态一致，方便别人嵌入核心）；rar 解压部分遵循 unRAR 许可（允许商用，不得用于创建 RAR），在 `LICENSE-THIRD-PARTY` 里单独列出。

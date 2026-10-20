@@ -21,6 +21,8 @@ enum SettingsKey {
     static let compressTest = "PiesiCompress"
     /// 隐藏启动参数 `-PiesiPassword <密码>`：配合 -PiesiCompress 给「加密」预设传密码
     static let compressPassword = "PiesiPassword"
+    /// 隐藏启动参数 `-PiesiFeedURL <地址>`：换掉自动更新的清单地址，演练更新流程用（见 Updater）
+    static let feedURL = "PiesiFeedURL"
 }
 
 /// 双击压缩包的默认动作。
