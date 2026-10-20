@@ -136,7 +136,10 @@ fn aes_encrypted_roundtrip() {
     std::fs::write(src.join("sub/text.txt"), "lorem ipsum ".repeat(5000)).unwrap();
     let random = pseudo_random(1 << 16);
     std::fs::write(src.join("sub/random.bin"), &random).unwrap();
+    #[cfg(unix)]
     std::os::unix::fs::symlink("text.txt", src.join("sub/link")).unwrap();
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file("text.txt", src.join("sub/link")).unwrap();
 
     let out = work.join("enc.zip");
     let password = "s3cret-Pass";

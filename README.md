@@ -3,6 +3,9 @@
 默认干净、中文不乱码、能像 Finder 一样浏览压缩包的现代原生 Mac 压缩工具。
 Rust 核心可跨平台，开源（MIT OR Apache-2.0）。
 
+Windows / Linux 提供 x64 命令行安装包（Windows Setup / ZIP、Linux DEB / RPM / tar.gz），
+下载 `Piesi CLI` Release，安装与使用说明见 [CLI 帮助](docs/cli.md)。图形客户端目前仅支持 macOS。
+
 - 设计方案：`docs/design.md`
 - 开发规则：`CLAUDE.md`
 - 发版规范：`docs/release.md`

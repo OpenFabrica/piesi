@@ -1,0 +1,156 @@
+# CLI 独立发版，不依赖 macOS 签名 Secret，也不改变 Sparkle 的 latest Release。
+name: cli-release
+on:
+  push:
+    branches: ["**"]
+    tags: ["cli-v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: CLI 发版门禁
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            VERSION=$(python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
+            [[ "$GITHUB_REF_NAME" == "cli-v$VERSION" && "$VERSION" != *-dev* ]]
+            git merge-base --is-ancestor HEAD origin/main
+            test -z "$(git status --porcelain --untracked-files=no)"
+          fi
+
+  build:
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            binary: piesi
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            binary: piesi.exe
+    runs-on: ${{ matrix.os }}
+    env:
+      # 安装包自带 MSVC 运行时，目标机器无需先安装 Visual C++ Redistributable。
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: "-C target-feature=+crt-static"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: 安装 Linux 打包工具
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev rpm
+      - name: 单元、集成与语料回归
+        run: cargo test --workspace --locked --target ${{ matrix.target }}
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked --target ${{ matrix.target }} -- -D warnings
+      - name: 构建 CLI
+        run: cargo build --release --locked -p piesi-cli --target ${{ matrix.target }}
+      - name: 黑盒冒烟
+        run: python scripts/smoke-cli.py target/${{ matrix.target }}/release/${{ matrix.binary }}
+      - name: 生成安装包、便携包与校验清单
+        run: python scripts/package-cli.py --binary target/${{ matrix.target }}/release/${{ matrix.binary }}
+      - name: 验证 Linux 便携包、DEB 安装卸载与 RPM 安装卸载
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/portable"
+          tar -xzf dist/cli/*.tar.gz -C "$RUNNER_TEMP/portable"
+          python scripts/smoke-cli.py "$RUNNER_TEMP"/portable/piesi-cli-*/piesi
+          sudo dpkg -i dist/cli/*.deb
+          python scripts/smoke-cli.py /usr/bin/piesi
+          sudo dpkg --remove piesi-cli
+          test ! -e /usr/bin/piesi
+          docker run --rm -v "$PWD/dist/cli:/packages:ro" -v "$PWD/scripts:/checks:ro" fedora:latest bash -euc '
+            dnf install -y python3 /packages/*.rpm
+            python3 /checks/smoke-cli.py /usr/bin/piesi
+            dnf remove -y piesi-cli
+            test ! -e /usr/bin/piesi'
+      - name: 验证 Windows 便携包、安装卸载与 PATH 清理
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $portable = Join-Path $env:RUNNER_TEMP 'portable'
+          Expand-Archive -Path (Get-ChildItem dist/cli/*.zip).FullName -DestinationPath $portable
+          python scripts/smoke-cli.py "$portable/piesi.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Portable smoke failed' }
+          $installDir = Join-Path $env:RUNNER_TEMP 'Piesi CLI'
+          $installer = (Get-ChildItem dist/cli/*-setup.exe).FullName
+          $result = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR=`"$installDir`"" -Wait -PassThru
+          if ($result.ExitCode -ne 0) { throw "Installer failed: $($result.ExitCode)" }
+          python scripts/smoke-cli.py "$installDir/piesi.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed smoke failed' }
+          $paths = (Get-ItemProperty HKCU:\Environment).Path -split ';'
+          if ($installDir -notin $paths) { throw 'PATH entry missing after install' }
+          $result = Start-Process -FilePath "$installDir/unins000.exe" -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
+          if ($result.ExitCode -ne 0) { throw "Uninstall failed: $($result.ExitCode)" }
+          if (Test-Path "$installDir/piesi.exe") { throw 'Binary still present after uninstall' }
+          $paths = (Get-ItemProperty HKCU:\Environment).Path -split ';'
+          if ($installDir -in $paths) { throw 'PATH entry still present after uninstall' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: dist/cli/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/cli-v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          merge-multiple: true
+          path: dist/cli
+      - name: 校验并合并 SHA-256 清单
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist/cli
+          sha256sum --check SHA256SUMS-linux-x86_64.txt
+          sha256sum --check SHA256SUMS-windows-x86_64.txt
+          cat SHA256SUMS-*-x86_64.txt | sort -k2 > SHA256SUMS.txt
+          test "$(wc -l < SHA256SUMS.txt)" -eq 5
+      - name: 生成 CLI 发行说明
+        shell: bash
+        run: |
+          awk 'BEGIN{n=0} /^## /{n++} n==1{print}' CHANGELOG.md > "$RUNNER_TEMP/cli-notes.md"
+          printf '\n安装和使用说明：[CLI 帮助](https://github.com/%s/blob/%s/docs/cli.md)。\n\n这是 Windows/Linux 命令行版，图形界面仍为 macOS 专用。\n' "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" >> "$RUNNER_TEMP/cli-notes.md"
+      - name: 发布 CLI Release（不设为 latest）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --latest=false \
+            --title "Piesi CLI ${GITHUB_REF_NAME#cli-v} · Windows / Linux" \
+            --notes-file "$RUNNER_TEMP/cli-notes.md" \
+            dist/cli/*.exe dist/cli/*.zip dist/cli/*.deb dist/cli/*.rpm dist/cli/*.tar.gz dist/cli/SHA256SUMS.txt
