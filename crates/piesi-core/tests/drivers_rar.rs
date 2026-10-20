@@ -143,7 +143,7 @@ fn header_password_flow() {
     }
 }
 
-/// 符号链接：RAR5 目标在头里（redir），RAR4 目标是文件内容；两种都交给 sink.symlink。
+/// RAR5 链接跨平台还原；RAR4 在 Unix 还原，在 unrar 不支持的 Windows 上跳过并告警。
 #[test]
 fn symlink_rar5_and_rar4() {
     let mut r = open("symlink5.rar");
@@ -160,9 +160,20 @@ fn symlink_rar5_and_rar4() {
     assert_eq!(link.kind, EntryKind::Symlink);
     assert_eq!(link.unix_mode.map(|m| m & 0o170000), Some(0o120000));
     let (sink, report) = extract_all(&mut r);
-    assert_eq!(sink.links, vec![("link.txt".to_owned(), b"hello.txt".to_vec())]);
     assert_eq!(sink.files.get("hello.txt").map(Vec::as_slice), Some(HELLO));
-    assert_eq!(report.extracted, 2);
+    #[cfg(not(windows))]
+    {
+        assert_eq!(sink.links, vec![("link.txt".to_owned(), b"hello.txt".to_vec())]);
+        assert_eq!(report.extracted, 2);
+    }
+    #[cfg(windows)]
+    {
+        // unrar 的 ExtractSymlink 在 Windows 仅实现 RAR5，不伪装成普通文件或静默丢弃。
+        assert!(sink.links.is_empty());
+        assert_eq!(report.extracted, 1);
+        assert_eq!(report.skipped, 1);
+        assert!(report.warnings.iter().any(|warning| warning.kind == piesi_core::WarningKind::RarSymlinkRejected));
+    }
 }
 
 /// 分卷：RAR5 的 .part1.rar 与 RAR4 的 .rar/.r00/.r01，只传首卷。

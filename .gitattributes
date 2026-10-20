@@ -1,0 +1,4 @@
+# 固定文本换行；归档与语料中的字节必须和 Git 中存储的内容完全一致。
+* text=auto eol=lf
+crates/piesi-core/tests/fixtures/** -text
+tests/corpus/** -text

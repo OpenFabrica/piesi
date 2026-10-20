@@ -51,6 +51,7 @@ piesi a archive.tar.zst folder
 默认跳过 `__MACOSX`、`.DS_Store` 等垃圾；同名文件默认改名，可用 `--overwrite` 或 `--skip` 调整。
 `--mac-metadata` 在 Windows / Linux 上不读取 macOS 元数据；Unix 权限位仅在 Unix 系统还原。
 Windows 创建符号链接需要开发者模式或相应权限，失败时跳过链接并输出警告；悬空目录链接无法推断目录类型，按文件链接尝试。
+Windows 上游 unrar 不支持还原 RAR4 的符号链接，此类链接会跳过并告警；RAR4 普通文件和 RAR5 链接不受此限制。
 
 ## 卸载与更新
 

@@ -10,6 +10,7 @@
 - 修正 Windows 的 Unix 权限依赖与符号链接创建，保留安全解压边界
 - 安装包经过 Windows、Ubuntu 和 Fedora 容器中的实际安装、命令执行与卸载验证
 - 此次只发布命令行版；Windows 需要 Windows 10/11 x64，Linux 需要 glibc 2.35 或更新版本
+- 已知限制：Windows 上 RAR4 符号链接会跳过并告警（上游 unrar 平台限制），普通文件和 RAR5 链接可正常处理
 
 ## 0.1.0 · 2026-10-20 · beta
 
