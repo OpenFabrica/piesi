@@ -316,6 +316,8 @@ mod tests {
         assert!(!root.join("a/evil").exists() && std::fs::symlink_metadata(root.join("a/evil")).is_err());
         let mtime = std::fs::metadata(root.join("a/b/hello.txt")).unwrap().modified().unwrap();
         assert_eq!(mtime.duration_since(UNIX_EPOCH).unwrap().as_secs(), 1_600_000_000);
+        // Windows 不允许删除仍被目录能力句柄打开的根目录。
+        drop(sink);
         std::fs::remove_dir_all(&root).unwrap();
     }
 

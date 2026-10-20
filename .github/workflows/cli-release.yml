@@ -13,6 +13,7 @@ permissions:
 jobs:
   gate:
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +34,7 @@ jobs:
 
   build:
     needs: gate
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -66,7 +68,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y dpkg-dev rpm
       - name: 单元、集成与语料回归
-        run: cargo test --workspace --locked --target ${{ matrix.target }}
+        run: cargo test --workspace --locked --no-fail-fast --target ${{ matrix.target }}
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked --target ${{ matrix.target }} -- -D warnings
       - name: 构建 CLI
@@ -124,6 +126,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/cli-v')
     needs: build
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:

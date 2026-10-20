@@ -123,7 +123,8 @@ def main() -> None:
     for artifact in artifacts:
         with artifact.open("rb") as stream:
             checksums.append(f"{hashlib.file_digest(stream, 'sha256').hexdigest()}  {artifact.name}\n")
-    manifest.write_text("".join(checksums), encoding="utf-8")
+    # Windows 也固定使用 LF，保证合并后的清单可直接交给 Linux sha256sum。
+    manifest.write_text("".join(checksums), encoding="utf-8", newline="\n")
     for artifact in artifacts:
         print(artifact)
     print(manifest)
