@@ -64,7 +64,7 @@ fn make_tree(tag: &str) -> (PathBuf, PathBuf, Vec<(String, Vec<u8>)>) {
     #[cfg(unix)]
     std::os::unix::fs::symlink("a/文件1.txt", src.join("链接")).unwrap();
     #[cfg(windows)]
-    std::os::windows::fs::symlink_file("a/文件1.txt", src.join("链接")).unwrap();
+    std::os::windows::fs::symlink_file("a\\文件1.txt", src.join("链接")).unwrap();
     (work, src, files)
 }
 

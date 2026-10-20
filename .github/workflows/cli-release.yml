@@ -60,6 +60,8 @@ jobs:
           targets: ${{ matrix.target }}
           components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - name: 安装 Linux 打包工具
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y dpkg-dev rpm
@@ -68,7 +70,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked --target ${{ matrix.target }} -- -D warnings
       - name: 构建 CLI
-        run: cargo build --release --locked -p piesi-cli --target ${{ matrix.target }}
+        run: cargo build --release --locked -p piesi-cli --target ${{ matrix.target }} --config 'profile.release.strip="debuginfo"'
       - name: 黑盒冒烟
         run: python scripts/smoke-cli.py target/${{ matrix.target }}/release/${{ matrix.binary }}
       - name: 生成安装包、便携包与校验清单

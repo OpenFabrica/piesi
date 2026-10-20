@@ -119,101 +119,95 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
     let throttle_ref = &mut throttle;
     let warnings_ref = &mut warnings;
     let spill_dir_ref = &spill_dir;
-    let result: Result<()> = rayon::ThreadPoolBuilder::new().num_threads(threads).build().map_err(Error::other)?.scope(move |scope| {
-        let out = out_ref;
-        let records = records_ref;
-        let throttle = throttle_ref;
-        let warnings = warnings_ref;
-        let spill_dir = spill_dir_ref;
-        // 生产者：只有文件需要压缩；目录和符号链接在主线程直接写
-        let tx_files = tx.clone();
-        drop(tx);
-        scope.spawn(move |s| {
-            for (index, item) in items.iter().enumerate() {
-                if item.kind != EntryKind::File {
-                    continue;
+    let result: Result<()> = rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .map_err(Error::other)?
+        .scope(move |scope| {
+            let out = out_ref;
+            let records = records_ref;
+            let throttle = throttle_ref;
+            let warnings = warnings_ref;
+            let spill_dir = spill_dir_ref;
+            // 生产者：只有文件需要压缩；目录和符号链接在主线程直接写
+            let tx_files = tx.clone();
+            drop(tx);
+            scope.spawn(move |s| {
+                for (index, item) in items.iter().enumerate() {
+                    if item.kind != EntryKind::File {
+                        continue;
+                    }
+                    if cancel.is_cancelled() {
+                        break;
+                    }
+                    let tx = tx_files.clone();
+                    let spill_dir = spill_dir.clone();
+                    s.spawn(move |_| {
+                        let r = compress_file(index, item, enc, &spill_dir);
+                        let _ = tx.send(r);
+                    });
                 }
-                if cancel.is_cancelled() {
-                    break;
-                }
-                let tx = tx_files.clone();
-                let spill_dir = spill_dir.clone();
-                s.spawn(move |_| {
-                    let r = compress_file(index, item, enc, &spill_dir);
-                    let _ = tx.send(r);
-                });
-            }
-        });
+            });
 
-        // 消费者（当前线程）：按 index 顺序写入；Mac 元数据的 `._` 条目紧跟在各自的条目后面，
-        // 和 ditto 一样，`__MACOSX/…/` 目录条目只在第一次用到时补一条
-        let mut pending: BTreeMap<usize, Compressed> = BTreeMap::new();
-        let mut macosx_dirs: BTreeSet<String> = BTreeSet::new();
-        for (index, item) in items.iter().enumerate() {
-            throttle.begin_entry(&item.rel)?;
-            match item.kind {
-                EntryKind::Dir => {
-                    let name = format!("{}/", item.rel).into_bytes();
-                    let rec = write_local(out, name, METHOD_STORE, 0, 0, 0, item, 0x10, None)?;
-                    records.push(rec);
-                    if opts.mac_metadata {
-                        write_apple_double(out, records, item, &mut macosx_dirs, enc, warnings)?;
-                    }
-                }
-                EntryKind::Symlink => {
-                    let target = item.link_target.clone().unwrap_or_default();
-                    let crc = crc32fast::hash(&target);
-                    // 链接目标也是内容，有密码就一样加密；很短，不压缩
-                    let (_, payload) = encode_bytes(&target, EncodeOpts { deflate: None, ..enc })?;
-                    let rec = write_local(
-                        out,
-                        item.rel.clone().into_bytes(),
-                        METHOD_STORE,
-                        crc,
-                        payload.len() as u64,
-                        target.len() as u64,
-                        item,
-                        0,
-                        enc.ae_version(target.len() as u64),
-                    )?;
-                    out.write_all(&payload)?;
-                    records.push(rec);
-                }
-                EntryKind::File => {
-                    let comp = loop {
-                        if let Some(c) = pending.remove(&index) {
-                            break c;
+            // 消费者（当前线程）：按 index 顺序写入；Mac 元数据的 `._` 条目紧跟在各自的条目后面，
+            // 和 ditto 一样，`__MACOSX/…/` 目录条目只在第一次用到时补一条
+            let mut pending: BTreeMap<usize, Compressed> = BTreeMap::new();
+            let mut macosx_dirs: BTreeSet<String> = BTreeSet::new();
+            for (index, item) in items.iter().enumerate() {
+                throttle.begin_entry(&item.rel)?;
+                match item.kind {
+                    EntryKind::Dir => {
+                        let name = format!("{}/", item.rel).into_bytes();
+                        let rec = write_local(out, name, METHOD_STORE, 0, 0, 0, item, 0x10, None)?;
+                        records.push(rec);
+                        if opts.mac_metadata {
+                            write_apple_double(out, records, item, &mut macosx_dirs, enc, warnings)?;
                         }
-                        match rx.recv() {
-                            Ok(Ok(c)) => {
-                                pending.insert(c.index, c);
+                    }
+                    EntryKind::Symlink => {
+                        let target = item.link_target.clone().unwrap_or_default();
+                        let crc = crc32fast::hash(&target);
+                        // 链接目标也是内容，有密码就一样加密；很短，不压缩
+                        let (_, payload) = encode_bytes(&target, EncodeOpts { deflate: None, ..enc })?;
+                        let rec = write_local(out, item.rel.clone().into_bytes(), METHOD_STORE, crc, payload.len() as u64, target.len() as u64, item, 0, enc.ae_version(target.len() as u64))?;
+                        out.write_all(&payload)?;
+                        records.push(rec);
+                    }
+                    EntryKind::File => {
+                        let comp = loop {
+                            if let Some(c) = pending.remove(&index) {
+                                break c;
                             }
-                            Ok(Err(e)) => return Err(e),
-                            Err(_) => return Err(Error::Other("压缩线程提前退出".into())),
+                            match rx.recv() {
+                                Ok(Ok(c)) => {
+                                    pending.insert(c.index, c);
+                                }
+                                Ok(Err(e)) => return Err(e),
+                                Err(_) => return Err(Error::Other("压缩线程提前退出".into())),
+                            }
+                        };
+                        let csize = match &comp.data {
+                            Payload::Memory(v) => v.len() as u64,
+                            Payload::Spilled(p) => std::fs::metadata(&p.0)?.len(),
+                        };
+                        let rec = write_local(out, item.rel.clone().into_bytes(), comp.method, comp.crc, csize, comp.size, item, 0, enc.ae_version(comp.size))?;
+                        match comp.data {
+                            Payload::Memory(v) => out.write_all(&v)?,
+                            Payload::Spilled(p) => {
+                                let mut f = File::open(&p.0)?;
+                                io::copy(&mut f, out)?;
+                            }
                         }
-                    };
-                    let csize = match &comp.data {
-                        Payload::Memory(v) => v.len() as u64,
-                        Payload::Spilled(p) => std::fs::metadata(&p.0)?.len(),
-                    };
-                    let rec = write_local(out, item.rel.clone().into_bytes(), comp.method, comp.crc, csize, comp.size, item, 0, enc.ae_version(comp.size))?;
-                    match comp.data {
-                        Payload::Memory(v) => out.write_all(&v)?,
-                        Payload::Spilled(p) => {
-                            let mut f = File::open(&p.0)?;
-                            io::copy(&mut f, out)?;
+                        throttle.add_bytes(comp.size)?;
+                        records.push(rec);
+                        if opts.mac_metadata {
+                            write_apple_double(out, records, item, &mut macosx_dirs, enc, warnings)?;
                         }
-                    }
-                    throttle.add_bytes(comp.size)?;
-                    records.push(rec);
-                    if opts.mac_metadata {
-                        write_apple_double(out, records, item, &mut macosx_dirs, enc, warnings)?;
                     }
                 }
             }
-        }
-        Ok(())
-    });
+            Ok(())
+        });
     result?;
 
     // 中央目录
@@ -257,14 +251,7 @@ pub fn write_zip(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpC
 /// 「Mac 专用」：读 item 的 Finder 信息、扩展属性、资源分支，打成 AppleDouble 写成
 /// `__MACOSX/<同目录>/._<名字>` 条目，紧跟在 item 自己的条目后面；没有元数据就什么都不写。
 /// 读元数据失败只记 warning 不中断——丢一个文件的标签不值得让整个包失败。符号链接由调用方跳过。
-fn write_apple_double(
-    out: &mut CountingWriter,
-    records: &mut Vec<CentralRecord>,
-    item: &SourceItem,
-    macosx_dirs: &mut BTreeSet<String>,
-    enc: EncodeOpts<'_>,
-    warnings: &mut Vec<Warning>,
-) -> Result<()> {
+fn write_apple_double(out: &mut CountingWriter, records: &mut Vec<CentralRecord>, item: &SourceItem, macosx_dirs: &mut BTreeSet<String>, enc: EncodeOpts<'_>, warnings: &mut Vec<Warning>) -> Result<()> {
     let meta = match apple_double::read(&item.path, warnings) {
         Ok(m) => m,
         Err(e) => {
@@ -280,26 +267,8 @@ fn write_apple_double(
     let raw = apple_double::encode(&meta);
     let (method, payload) = encode_bytes(&raw, enc)?;
     // `._` 条目和 ditto 一样：普通文件、0644、时间跟原条目
-    let ad_item = SourceItem {
-        rel: ad_rel.clone(),
-        path: item.path.clone(),
-        kind: EntryKind::File,
-        size: raw.len() as u64,
-        mtime: item.mtime,
-        mode: Some(0o644),
-        link_target: None,
-    };
-    let rec = write_local(
-        out,
-        ad_rel.into_bytes(),
-        method,
-        crc32fast::hash(&raw),
-        payload.len() as u64,
-        raw.len() as u64,
-        &ad_item,
-        0,
-        enc.ae_version(raw.len() as u64),
-    )?;
+    let ad_item = SourceItem { rel: ad_rel.clone(), path: item.path.clone(), kind: EntryKind::File, size: raw.len() as u64, mtime: item.mtime, mode: Some(0o644), link_target: None };
+    let rec = write_local(out, ad_rel.into_bytes(), method, crc32fast::hash(&raw), payload.len() as u64, raw.len() as u64, &ad_item, 0, enc.ae_version(raw.len() as u64))?;
     out.write_all(&payload)?;
     records.push(rec);
     Ok(())
@@ -315,15 +284,7 @@ fn ensure_macosx_dirs(out: &mut CountingWriter, records: &mut Vec<CentralRecord>
         }
         acc.push_str(comp);
         if done.insert(acc.clone()) {
-            let dir_item = SourceItem {
-                rel: acc.clone(),
-                path: item.path.clone(),
-                kind: EntryKind::Dir,
-                size: 0,
-                mtime: item.mtime,
-                mode: Some(0o755),
-                link_target: None,
-            };
+            let dir_item = SourceItem { rel: acc.clone(), path: item.path.clone(), kind: EntryKind::Dir, size: 0, mtime: item.mtime, mode: Some(0o755), link_target: None };
             let rec = write_local(out, format!("{acc}/").into_bytes(), METHOD_STORE, 0, 0, 0, &dir_item, 0x10, None)?;
             records.push(rec);
         }
@@ -575,17 +536,7 @@ fn extra_fields(csize: u64, usize_: u64, offset: Option<u64>, mtime: Option<i64>
 /// 加密时方法字段写 99、真实方法进 0x9901 扩展字段、置 bit 0，AE-2 的 CRC 字段按规范写 0。
 /// 参数就是 ZIP 头的字段，拆成结构体只会多一层壳，这里允许超过 7 个。
 #[allow(clippy::too_many_arguments)]
-fn write_local(
-    out: &mut CountingWriter,
-    name: Vec<u8>,
-    method: u16,
-    crc: u32,
-    csize: u64,
-    usize_: u64,
-    item: &SourceItem,
-    dos_attr: u32,
-    aes: Option<u16>,
-) -> Result<CentralRecord> {
+fn write_local(out: &mut CountingWriter, name: Vec<u8>, method: u16, crc: u32, csize: u64, usize_: u64, item: &SourceItem, dos_attr: u32, aes: Option<u16>) -> Result<CentralRecord> {
     let local_offset = out.offset;
     let (dos_time, dos_date) = dos_datetime(item.mtime);
     let aes = aes.map(|version| (version, method));

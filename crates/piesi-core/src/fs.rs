@@ -121,11 +121,13 @@ impl DirSink {
         }
         #[cfg(windows)]
         {
-            let resolved = Path::new(rel).parent().unwrap_or(Path::new("")).join(target);
+            // NT 重解析点会原样保存目标；正斜杠不会像普通 Win32 路径那样自动转换。
+            let target = target.replace('/', "\\");
+            let resolved = Path::new(rel).parent().unwrap_or(Path::new("")).join(&target);
             if self.root.is_dir(resolved) {
-                self.root.symlink_dir(target, rel)
+                self.root.symlink_dir(&target, rel)
             } else {
-                self.root.symlink_file(target, rel)
+                self.root.symlink_file(&target, rel)
             }
         }
     }
