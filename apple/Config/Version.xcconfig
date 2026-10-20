@@ -4,6 +4,6 @@
 // 所有 target（Piesi、PiesiQuickLook、PiesiFinder）都引用这个文件，Info.plist 里用 $(MARKETING_VERSION) 等取值。
 // CFBundleVersion（CURRENT_PROJECT_VERSION）跟 MARKETING_VERSION 走：Sparkle 按它比新旧，必须随发版递增；
 // 开发版 0.1.1-dev 的 CFBundleVersion 是 0.1.1，等于即将发的正式版，不会被提示「更新」到同一版。
-MARKETING_VERSION = 0.1.1
-VERSION_SUFFIX =
+MARKETING_VERSION = 0.1.2
+VERSION_SUFFIX = -dev
 CURRENT_PROJECT_VERSION = $(MARKETING_VERSION)

@@ -30,7 +30,7 @@
 
 | 语言 / 构建 | 版本号存哪里 | 开发版写法 | 带哈希的写法 | 注意 |
 |---|---|---|---|---|
-| Rust | 根 `Cargo.toml` 的 `[workspace.package] version`（当前 `0.1.1-dev`） | `0.1.1-dev` | `scripts/package.sh` 接 `-<短哈希>` | 改完跑一次 `cargo check`，让 `Cargo.lock` 跟着更新并一起提交 |
+| Rust | 根 `Cargo.toml` 的 `[workspace.package] version` | `0.1.1-dev` | `scripts/package.sh` 接 `-<短哈希>` | 改完跑一次 `cargo check`，让 `Cargo.lock` 跟着更新并一起提交 |
 | Swift / Xcode | `apple/Config/Version.xcconfig` 的 `MARKETING_VERSION`，另加 `VERSION_SUFFIX` | `MARKETING_VERSION = 0.1.1`，`VERSION_SUFFIX = -dev` | 构建脚本把短哈希写进 Info.plist 自定义键 `PiesiGitHash` | `CFBundleShortVersionString` 只认数字点号，开发标记不能进它；发版提交把 `VERSION_SUFFIX` 清空 |
 
 只认数字的字段（Info.plist、DMG 文件名里的版本）：在构建脚本里去掉后缀再传，不改源码里的版本号。
