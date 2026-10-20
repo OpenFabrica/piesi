@@ -115,6 +115,8 @@ struct ArchiveOutlineView: NSViewRepresentable {
         private var lastQuery = ""
         private var sortDescriptor: NSSortDescriptor?
         private var iconCache: [String: NSImage] = [:]
+        /// 「类型」列文字按扩展名缓存：UTType(filenameExtension:) 不便宜，按类型排序时每次比较都会调
+        private var kindTextCache: [String: String] = [:]
         private let dateFormatter: DateFormatter = {
             let f = DateFormatter()
             f.dateStyle = .short
@@ -365,8 +367,13 @@ struct ArchiveOutlineView: NSViewRepresentable {
             case .dir: text = "文件夹"
             case .symlink: text = "符号链接"
             case .file:
-                let ext = (row.name as NSString).pathExtension
-                text = ext.isEmpty ? "文件" : (UTType(filenameExtension: ext)?.localizedDescription ?? "\(ext.uppercased()) 文件")
+                let ext = (row.name as NSString).pathExtension.lowercased()
+                if let cached = kindTextCache[ext] {
+                    text = cached
+                } else {
+                    text = ext.isEmpty ? "文件" : (UTType(filenameExtension: ext)?.localizedDescription ?? "\(ext.uppercased()) 文件")
+                    kindTextCache[ext] = text
+                }
             }
             if row.encrypted {
                 text += "（加密）"

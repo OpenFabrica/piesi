@@ -65,13 +65,13 @@ final class BrowserModel {
         Log.browser.notice("encoding → \(encoding.shortName, privacy: .public)")
     }
 
-    /// forData 的包在预览 / 拖出前要密码；已经有就直接通过。
-    func ensurePassword(parent: NSWindow?) async -> Bool {
+    /// forData 的包在预览 / 校验 / 拖出前要密码；已经有就直接通过。wrongBefore = 上一次解码时发现密码不对。
+    func ensurePassword(parent: NSWindow?, wrongBefore: Bool) async -> Bool {
         guard let handle else { return false }
         if passwordState == .notNeeded || password != nil {
             return true
         }
-        return await askPassword(for: handle, name: url.lastPathComponent, parent: parent)
+        return await askPassword(for: handle, name: url.lastPathComponent, parent: parent, wrongBefore: wrongBefore)
     }
 
     /// 解压时才发现密码不对（forData 的包 setPassword 验不出来）：清掉，下次再问。
@@ -80,8 +80,8 @@ final class BrowserModel {
     }
 
     /// 反复要密码直到通过或取消。
-    private func askPassword(for handle: ArchiveHandle, name: String, parent: NSWindow?) async -> Bool {
-        var wrong = false
+    private func askPassword(for handle: ArchiveHandle, name: String, parent: NSWindow?, wrongBefore: Bool = false) async -> Bool {
+        var wrong = wrongBefore
         while true {
             guard let entered = await PasswordDialog.ask(archiveName: name, wrongBefore: wrong, parent: parent) else { return false }
             do {
@@ -103,29 +103,16 @@ final class BrowserModel {
         ExtractPresets(encoding: encodingInfo?.encoding, password: password)
     }
 
-    /// 把选中行转成可解压的 id。合成目录（id == max）没有真实条目，换成它下面所有子项的 id；
-    /// 真实目录只给自己的 id，Rust 会连同子树一起解。
+    /// 把选中行转成可解压的 id。合成目录（id == max）没有真实条目，用 idsUnder 一次遍历拿到它下面全部 id
+    /// （递归 listDir 每层都全量扫一遍，10 万条目会卡主线程）；真实目录只给自己的 id，Rust 会连同子树一起解。
     func extractionIDs(for rows: [Row]) -> [UInt32] {
         guard let handle else { return [] }
         var ids: [UInt32] = []
         for row in rows {
             if row.id == UInt32.max {
-                ids.append(contentsOf: Self.collectIDs(handle, dir: row.path))
+                ids.append(contentsOf: handle.idsUnder(dir: row.path))
             } else {
                 ids.append(row.id)
-            }
-        }
-        return ids
-    }
-
-    /// 递归收集某个合成目录下的真实条目 id（拖出和解压选中共用，拖出在后台线程调）。
-    nonisolated static func collectIDs(_ handle: ArchiveHandle, dir: String) -> [UInt32] {
-        var ids: [UInt32] = []
-        for child in handle.listDir(dir: dir) {
-            if child.id == UInt32.max {
-                ids.append(contentsOf: collectIDs(handle, dir: child.path))
-            } else {
-                ids.append(child.id)
             }
         }
         return ids

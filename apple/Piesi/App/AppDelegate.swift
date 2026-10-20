@@ -167,13 +167,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: 处理队列
 
     /// 一批文件的完整处理：按文件头分成压缩包和普通文件。压缩包逐个浏览或解压（解压做完才轮到下一个）；
-    /// 普通文件（拖到 Dock 图标 / 主窗口）合成一个压缩请求。
+    /// 扩展名是压缩包但文件头认不出的（损坏、没下完）报「无法打开」，不能当普通文件去压缩；
+    /// 剩下的普通文件（拖到 Dock 图标 / 主窗口）合成一个压缩请求。
     private func handle(_ request: OpenRequest) async {
         var archives: [URL] = []
         var others: [URL] = []
         for url in request.urls {
             if await CoreBridge.detectFormat(at: url) != nil {
                 archives.append(url)
+            } else if ArchiveTypes.looksLikeArchive(url) {
+                Log.open.error("unreadable archive \(url.path, privacy: .public)")
+                await Alerts.error("无法打开「\(url.lastPathComponent)」", "扩展名是压缩包，但内容无法识别，文件可能已损坏或没有下载完整。", in: nil)
             } else {
                 others.append(url)
             }
@@ -222,5 +226,15 @@ enum ArchiveTypes {
 
     static var all: [UTType] {
         identifiers.compactMap { UTType($0) }
+    }
+
+    /// 按扩展名 / 系统标注的类型判断「看起来是压缩包」：给文件头识别失败时区分「损坏的包」和「普通文件」用。
+    static func looksLikeArchive(_ url: URL) -> Bool {
+        var type = UTType(filenameExtension: url.pathExtension)
+        if type == nil {
+            type = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType
+        }
+        guard let type else { return false }
+        return all.contains { type.conforms(to: $0) }
     }
 }

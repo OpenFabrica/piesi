@@ -1,15 +1,36 @@
-// BrowserWindowController.swift —— 浏览窗口（设计 6.1）：每个压缩包一个窗口，负责解压、Quick Look、⌘↓ 打开、拖出。
+// BrowserWindowController.swift —— 浏览窗口（设计 6.1）：每个压缩包一个窗口，负责解压、校验、Quick Look、⌘↓ 打开、拖出。
 import AppKit
 import Quartz
 import SwiftUI
+
+/// Quick Look 的预览项：临时文件名是 <id>-<名字>，面板标题要显示原名。
+final class PreviewItem: NSObject, QLPreviewItem, @unchecked Sendable {
+    let previewItemURL: URL!
+    let previewItemTitle: String!
+    let rowID: UInt32
+
+    init(url: URL, title: String, rowID: UInt32) {
+        previewItemURL = url
+        previewItemTitle = title
+        self.rowID = rowID
+    }
+}
 
 /// 浏览窗口控制器。控制器自己持有引用，关窗口时释放；也是 Quick Look 面板的数据源。
 @MainActor
 final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
     private static var openControllers: [BrowserWindowController] = []
     let model: BrowserModel
-    /// Quick Look 当前预览的临时文件（Rust 解到 temp/piesi-preview-<pid>/，退出时整个删掉）
-    private var previewURL: URL?
+    /// 预览专用的第二个句柄：Rust 解码期间持锁，不能占浏览用的那个，否则主线程的 listDir / search 会卡
+    private var previewHandle: ArchiveHandle?
+    /// 当前预览的取消句柄：换预览或关窗时取消，解码不会在后台一直跑
+    private var previewCancel: CancelHandle?
+    /// Quick Look 当前的预览项（临时文件由 Rust 写在 temp/piesi-preview-<pid>/）
+    private var previewItem: PreviewItem?
+    /// ⌘↓ 交给外部 app 打开过的临时文件：换预览时不能删，别的 app 可能还开着
+    private var externallyOpened: Set<URL> = []
+    /// forData 的包拖出时正在问密码：一次拖动多项只问一次
+    private var isAskingPassword = false
 
     /// 开一个新窗口浏览 url。
     static func open(url: URL) {
@@ -64,11 +85,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
         fatalError("不用 nib")
     }
 
-    /// 窗口关掉就把自己从列表里拿掉，句柄随 model 释放。
+    /// 窗口关掉：停掉还在跑的预览解码、关 Quick Look、删临时文件、把自己从列表里拿掉（句柄随 model 释放）。
     func windowWillClose(_ notification: Notification) {
+        previewCancel?.cancel()
         if let panel = QLPreviewPanel.sharedPreviewPanelExists() ? QLPreviewPanel.shared() : nil, panel.isVisible, panel.dataSource === self {
             panel.close()
         }
+        discardPreviewFile()
         Self.openControllers.removeAll { $0 === self }
     }
 
@@ -96,11 +119,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
     // MARK: 校验
 
     /// [测试]：另开一个句柄（校验期间持锁，不能占浏览用的那个），解码 + CRC 不写盘，结果用 NSAlert 显示。
+    /// forData 的包先要密码，否则解码直接失败。
     private func verify() {
         guard model.isLoaded, let window else { return }
         let name = model.url.lastPathComponent
-        let presets = model.presets
         Task { @MainActor in
+            guard await model.ensurePassword(parent: window, wrongBefore: false) else { return }
+            let presets = model.presets
             let handle: ArchiveHandle
             do {
                 handle = try await CoreBridge.open(model.url)
@@ -147,16 +172,44 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
 
     // MARK: 预览与打开
 
-    /// 解单个条目到临时文件；forData 的包先要密码，密码错了再要一次。
+    /// 懒开预览句柄，并把窗口当前的密码 / 编码同步过去（用户可能刚切了编码）。
+    private func preparedPreviewHandle() async throws -> ArchiveHandle {
+        let handle: ArchiveHandle
+        if let existing = previewHandle {
+            handle = existing
+        } else {
+            handle = try await CoreBridge.open(model.url)
+            previewHandle = handle
+        }
+        let presets = model.presets
+        if let password = presets.password {
+            try await CoreBridge.setPassword(handle, password)
+        }
+        if let encoding = presets.encoding {
+            handle.setEncoding(encoding: encoding)
+        }
+        return handle
+    }
+
+    /// 解单个条目到临时文件；forData 的包先要密码，密码错了带「错误」提示再要一次（最多三次）。
     private func temporaryFile(for row: Row) async -> URL? {
-        guard let handle = model.handle, row.kind == .file else { return nil }
+        guard model.isLoaded, row.kind == .file else { return nil }
+        var wrong = false
         for _ in 0..<3 {
-            guard await model.ensurePassword(parent: window) else { return nil }
+            guard await model.ensurePassword(parent: window, wrongBefore: wrong) else { return nil }
             do {
-                return try await CoreBridge.extractToTemp(handle, id: row.id, cancel: CancelHandle())
+                let handle = try await preparedPreviewHandle()
+                previewCancel?.cancel()
+                let cancel = CancelHandle()
+                previewCancel = cancel
+                return try await CoreBridge.extractToTemp(handle, id: row.id, cancel: cancel)
             } catch {
+                if CoreBridge.isCancelled(error) {
+                    return nil
+                }
                 if CoreBridge.isWrongPassword(error) {
                     model.forgetPassword()
+                    wrong = true
                     continue
                 }
                 await Alerts.error("无法预览「\(row.name)」", CoreBridge.message(for: error), in: window)
@@ -166,16 +219,26 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
         return nil
     }
 
-    /// 双击 / 空格：已经开着 Quick Look 就关掉（空格的切换习惯），否则解到临时文件再打开面板。
+    /// 删掉上一个 Quick Look 临时文件（换预览或关窗时）；⌘↓ 打开过的留到退出时一起清。
+    private func discardPreviewFile() {
+        if let url = previewItem?.previewItemURL, !externallyOpened.contains(url) {
+            try? FileManager.default.removeItem(at: url)
+        }
+        previewItem = nil
+    }
+
+    /// 双击 / 空格：同一条目且面板开着就关掉（空格的切换习惯），否则解到临时文件再打开面板。
     private func preview(_ row: Row) {
         if let panel = QLPreviewPanel.sharedPreviewPanelExists() ? QLPreviewPanel.shared() : nil, panel.isVisible,
-           previewURL?.lastPathComponent == row.name {
+           previewItem?.rowID == row.id {
             panel.close()
             return
         }
         Task { @MainActor in
+            // 先删旧文件再解：同一条目关掉面板后再预览，新旧临时路径相同，后删会把刚解出来的文件删掉
+            discardPreviewFile()
             guard let url = await temporaryFile(for: row) else { return }
-            previewURL = url
+            previewItem = PreviewItem(url: url, title: row.name, rowID: row.id)
             Log.browser.notice("preview \(row.path, privacy: .public)")
             let panel = QLPreviewPanel.shared()!
             if panel.isVisible {
@@ -186,21 +249,27 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
         }
     }
 
-    /// ⌘↓：临时解压后用默认 app 打开。
+    /// ⌘↓：临时解压后用默认 app 打开。文件留到退出时一起清，别的 app 可能还开着它。
     private func openWithDefaultApp(_ row: Row) {
         Task { @MainActor in
             guard let url = await temporaryFile(for: row) else { return }
+            externallyOpened.insert(url)
             Log.browser.notice("open with default app \(row.path, privacy: .public)")
             NSWorkspace.shared.open(url)
         }
     }
 
-    /// 拖出：交给 NSFilePromiseProvider，在后台解。
+    /// 拖出：交给 NSFilePromiseProvider，在后台解。forData 的包没密码就先问一次（多选拖出也只问一次），这次拖动不给承诺。
     private func promiseProvider(for row: Row) -> NSPasteboardWriting? {
         guard model.isLoaded else { return nil }
-        // forData 的包没密码就拖不出来：先要一次，这里不能 await，只能提示
         if model.passwordState == .forData, model.password == nil {
-            Task { @MainActor in _ = await model.ensurePassword(parent: window) }
+            if !isAskingPassword {
+                isAskingPassword = true
+                Task { @MainActor in
+                    _ = await model.ensurePassword(parent: window, wrongBefore: false)
+                    isAskingPassword = false
+                }
+            }
             return nil
         }
         return EntryPromiseDelegate.makeProvider(archiveURL: model.url, row: row, presets: model.presets)
@@ -228,10 +297,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, QLPre
     }
 
     nonisolated func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
-        MainActor.assumeIsolated { previewURL == nil ? 0 : 1 }
+        MainActor.assumeIsolated { previewItem == nil ? 0 : 1 }
     }
 
     nonisolated func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! {
-        MainActor.assumeIsolated { previewURL as NSURL? }
+        MainActor.assumeIsolated { previewItem }
     }
 }

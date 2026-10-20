@@ -2,12 +2,13 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// 文件承诺的委托。每次拖动一个实例；写入在 provider 的后台队列上同步完成。
+/// 文件承诺的委托。每个被拖的条目一个实例；写入在共用的串行队列上同步完成。
 final class EntryPromiseDelegate: NSObject, NSFilePromiseProviderDelegate, @unchecked Sendable {
     private let archiveURL: URL
     private let row: Row
     private let presets: ExtractPresets
-    private let queue: OperationQueue = {
+    /// 所有拖出共用一条串行队列：多选拖 N 项不会并发开 N 个句柄同时解码。
+    private static let sharedQueue: OperationQueue = {
         let q = OperationQueue()
         q.name = "piesi.drag-export"
         q.maxConcurrentOperationCount = 1
@@ -35,20 +36,28 @@ final class EntryPromiseDelegate: NSObject, NSFilePromiseProviderDelegate, @unch
         return provider
     }
 
+    /// Finder 问「落地叫什么名字」：用条目自己的名字。
     func filePromiseProvider(_ filePromiseProvider: NSFilePromiseProvider, fileNameForType fileType: String) -> String {
         row.name
     }
 
+    /// 写入在哪条队列上跑：共用的串行后台队列，不占主线程。
     func operationQueue(for filePromiseProvider: NSFilePromiseProvider) -> OperationQueue {
-        queue
+        Self.sharedQueue
     }
 
+    /// Finder 给了目标位置：解出来搬过去；失败回主线程弹一次提示，并把错误交回 Finder。
     func filePromiseProvider(_ filePromiseProvider: NSFilePromiseProvider, writePromiseTo url: URL, completionHandler: @escaping (Error?) -> Void) {
         do {
             try DragExport.write(archive: archiveURL, row: row, presets: presets, to: url)
             completionHandler(nil)
         } catch {
-            Log.browser.error("drag export failed \(self.row.path, privacy: .public): \(CoreBridge.message(for: error), privacy: .public)")
+            let message = CoreBridge.message(for: error)
+            let name = row.name
+            Log.browser.error("drag export failed \(self.row.path, privacy: .public): \(message, privacy: .public)")
+            Task { @MainActor in
+                await Alerts.error("拖出「\(name)」失败", message, in: nil)
+            }
             completionHandler(error)
         }
     }
@@ -70,7 +79,8 @@ enum DragExport {
         try fm.createDirectory(at: temp, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: temp) }
 
-        let ids = row.id == UInt32.max ? BrowserModel.collectIDs(handle, dir: row.path) : [row.id]
+        // 合成目录（id == max）没有真实条目，用 idsUnder 一次拿到它下面的全部 id
+        let ids = row.id == UInt32.max ? handle.idsUnder(dir: row.path) : [row.id]
         let request = ExtractRequest(dest: temp.path, smartFolder: false, conflict: .overwrite, skipJunk: true, ids: ids)
         let listener = SilentProgress()
         _ = try handle.extract(request: request, listener: listener, cancel: CancelHandle())
@@ -79,6 +89,7 @@ enum DragExport {
         guard fm.fileExists(atPath: produced.path) else {
             throw PiesiError.Other(message: "解出的文件不在预期位置：\(row.path)")
         }
+        // 目标已存在时直接替换是安全的：Finder 给的 url 要么是它刚起的不冲突的名字，要么是用户在冲突提示里选了「替换」
         if fm.fileExists(atPath: destination.path) {
             try fm.removeItem(at: destination)
         }
