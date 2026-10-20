@@ -77,7 +77,7 @@ flowchart LR
 
 `.github/workflows/cli-release.yml` 在分支推送及 PR 上验证两个平台，只有 `cli-v<版本>` 标签发布。
 `scripts/package-cli.py` 从 Cargo.toml 读取唯一版本并核对 `piesi --version`，调用 Inno Setup、dpkg-deb 和 rpmbuild。
-`scripts/smoke-cli.py` 对实际二进制验证中文路径、各创建格式、ZIP/7z 加密、错误密码、损坏输入和路径穿越防护。
+`scripts/smoke-cli.py` 对实际二进制验证中文路径、各创建格式、ZIP/7z 加密、RAR4/RAR5 读取与落盘、错误密码、损坏输入和路径穿越防护。
 CI 对 Windows 安装卸载及 PATH、Ubuntu DEB 安装卸载、Fedora 容器 RPM 安装卸载做实际验证，任一步失败都不会发布。
 标签必须位于 main 且不含开发标记；CLI Release 不设为 latest，以保留 macOS Sparkle 的更新源。
 版本推进和标签不可变规则见 `release.md`。

@@ -88,9 +88,9 @@ jobs:
           python scripts/smoke-cli.py /usr/bin/piesi
           sudo dpkg --remove piesi-cli
           test ! -e /usr/bin/piesi
-          docker run --rm -v "$PWD/dist/cli:/packages:ro" -v "$PWD/scripts:/checks:ro" fedora:latest bash -euc '
+          docker run --rm -v "$PWD/dist/cli:/packages:ro" -v "$PWD/scripts:/checks:ro" -v "$PWD/crates/piesi-core/tests/fixtures:/fixtures:ro" fedora:latest bash -euc '
             dnf install -y python3 /packages/*.rpm
-            python3 /checks/smoke-cli.py /usr/bin/piesi
+            python3 /checks/smoke-cli.py /usr/bin/piesi --fixtures /fixtures
             dnf remove -y piesi-cli
             test ! -e /usr/bin/piesi'
       - name: 验证 Windows 便携包、安装卸载与 PATH 清理

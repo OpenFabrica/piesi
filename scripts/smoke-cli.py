@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import zipfile
@@ -23,6 +24,7 @@ def main() -> None:
     """覆盖中文路径、各创建格式、加密、错误输入与路径穿越防护。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
+    parser.add_argument("--fixtures", type=Path, default=Path(__file__).resolve().parents[1] / "crates/piesi-core/tests/fixtures")
     args = parser.parse_args()
     binary = args.binary.resolve()
     with tempfile.TemporaryDirectory(prefix="piesi-smoke-") as temp:
@@ -59,6 +61,16 @@ def main() -> None:
             destination = work / f"encrypted-{extension}"
             check(binary, work, "x", name, "-p", "密码-123", "-o", str(destination), "--no-smart-folder", "-q")
             assert (destination / source.name / "内容.txt").read_bytes() == data
+        for version in (4, 5):
+            name = f"中文归档-RAR{version}.rar"
+            shutil.copyfile(args.fixtures / "rar" / f"rar{version}.rar", work / name)
+            entries = json.loads(check(binary, work, "list", name, "--json"))["entries"]
+            assert any(entry["name"] == "中文名.txt" for entry in entries), entries
+            check(binary, work, "t", name, "-q")
+            destination = work / f"rar-{version}"
+            check(binary, work, "x", name, "-o", str(destination), "--no-smart-folder", "-q")
+            assert (destination / "hello.txt").read_bytes() == b"hello piesi\n"
+            assert (destination / "中文名.txt").read_bytes() == "中文内容\n".encode()
         with zipfile.ZipFile(work / "unsafe.zip", "w") as archive:
             archive.writestr("../escaped.txt", b"must not escape")
             archive.writestr("safe.txt", b"safe")

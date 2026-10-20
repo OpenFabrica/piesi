@@ -1080,7 +1080,7 @@ fn wide_to_string(w: &[sys::WCHAR]) -> String {
     let w = &w[..end];
     #[cfg(windows)]
     {
-        String::from_utf16_lossy(&w[..end])
+        String::from_utf16_lossy(w)
     }
     #[cfg(not(windows))]
     {
