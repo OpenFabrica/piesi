@@ -12,6 +12,12 @@ options:
   # 开发语言（回落语言）设成 en：没覆盖的语言（德语、韩语…）看到英文，而不是中文键。
   developmentLanguage: en
 
+# 第三方 Swift 包：只有 Sparkle（自动更新，设计 6.6），锁死版本，升级要手动改这里
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
+
 # 版本号只存 Config/Version.xcconfig 一处（docs/release.md 第 4 条）
 configFiles:
   Debug: Config/Version.xcconfig
@@ -60,6 +66,8 @@ targets:
       # 静态库 xcframework：只链接不嵌入（里面没有动态库）
       - framework: PiesiCore.xcframework
         embed: false
+      # 自动更新框架，嵌入 Frameworks/（发版签名见 scripts/package.sh）
+      - package: Sparkle
       # Quick Look 扩展、Finder 右键菜单扩展随 app 一起打包到 PlugIns/
       - target: PiesiQuickLook
       - target: PiesiFinder

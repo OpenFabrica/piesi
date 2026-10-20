@@ -156,6 +156,14 @@
 	</array>
 	<!-- 7z/rar/zst 三个类型都导入兜底（导入声明只在没有别的导出声明时生效）：
 	     7z 系统 CoreTypes 声明为 org.7-zip.7-zip-archive（Keka/BetterZip 也用这个），rar 和 zst 系统没声明。 -->
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/OpenFabrica/piesi/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>7+75QN3g4VTFjRuvgAlzEwByv+Jb6d9klbOLSfrvmOY=</string>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>

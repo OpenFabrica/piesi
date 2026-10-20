@@ -4,6 +4,7 @@
 #   APPLE_SIGN_IDENTITY   签名身份（默认 Developer ID Application: Jiangwei Lan (HQ537XMLJY)）
 #   APPLE_NOTARY_PROFILE  notarytool 的 keychain profile（默认 aster-notary）
 #   SKIP_NOTARIZE=1       只签名不公证（本地测试包）
+#   APPCAST=1             不发版也生成 dist/appcast.xml（演练自动更新；APPCAST_URL_PREFIX 可换下载地址前缀）
 #   RELEASE=1             发版门禁（docs/release.md 第 6 条）：拒绝开发标记、版本与标签不一致、未提交改动
 #   APPLE_NOTARY_KEY      CI 用 App Store Connect API Key 公证：.p8 路径，另需 APPLE_NOTARY_KEY_ID、APPLE_NOTARY_ISSUER；
 #                         设了就不经钥匙串 profile
@@ -56,6 +57,14 @@ xcodebuild -project apple/Piesi.xcodeproj -scheme Piesi -configuration Release \
 APP=$(find apple/build/Build/Products/Release -maxdepth 1 -name "Piesi.app" | head -1)
 [ -n "$APP" ] || { echo "找不到 Piesi.app" >&2; exit 1; }
 
+# Sparkle：框架里的辅助程序（XPC 服务、Autoupdate、Updater.app）要由里到外逐个用 Developer ID + hardened runtime 重签。
+# Xcode 嵌入时只签框架外层，里面还是 Sparkle 官方的签名，公证会拒（Sparkle 文档「Distributing your app」）
+SPARKLE_FW="$APP/Contents/Frameworks/Sparkle.framework"
+for item in "$SPARKLE_FW"/Versions/B/XPCServices/*.xpc "$SPARKLE_FW/Versions/B/Autoupdate" "$SPARKLE_FW/Versions/B/Updater.app" "$SPARKLE_FW"; do
+  [ -e "$item" ] || continue
+  codesign --force --options runtime --timestamp --preserve-metadata=entitlements --sign "$IDENTITY" "$item"
+done
+
 # 深度签名：先扩展后主 app（嵌套的 appex 必须先签），都带 hardened runtime 与时间戳。
 # 必须保留 Xcode 签进去的 entitlements：重签不带它会被清空，appex 没了沙盒系统就不加载，App Group 交接也会断
 find "$APP/Contents/PlugIns" -name "*.appex" -maxdepth 1 2>/dev/null | while read -r appex; do
@@ -88,5 +97,25 @@ if [ "${SKIP_NOTARIZE:-0}" != "1" ]; then
   xcrun stapler staple "$DMG"
   xcrun stapler validate "$DMG"
   spctl -a -t open --context context:primary-signature -vv "$DMG"
+fi
+
+# 自动更新清单（设计 6.6）：发版（RELEASE=1）或 APPCAST=1 时，用 Sparkle 的 generate_appcast 给最终的 DMG
+# 做 EdDSA 签名，写 dist/appcast.xml（只含这一版，Sparkle 只要最新一条）。必须在公证 + staple 之后，签的是最终字节。
+# 私钥：CI 用 SPARKLE_ED_KEY_FILE（Secret 写出的文件）；本机用登录钥匙串里账户 piesi 的那把（generate_keys --account piesi）。
+# 本版更新说明取 CHANGELOG.md 顶部小节，写成与 DMG 同名的 .md，嵌进 appcast
+if [ "${RELEASE:-0}" = "1" ] || [ "${APPCAST:-0}" = "1" ]; then
+  SPARKLE_BIN="$ROOT/apple/build/SourcePackages/artifacts/sparkle/Sparkle/bin"
+  if [ -f CHANGELOG.md ]; then
+    awk 'BEGIN{n=0} /^## /{n++} n==1{print}' CHANGELOG.md > "${DMG%.dmg}.md"
+    [ -s "${DMG%.dmg}.md" ] || rm -f "${DMG%.dmg}.md"
+  fi
+  APPCAST_ARGS=(--download-url-prefix "${APPCAST_URL_PREFIX:-https://github.com/OpenFabrica/piesi/releases/download/v$RUST_VER/}" --embed-release-notes -o "$DIST/appcast.xml")
+  if [ -n "${SPARKLE_ED_KEY_FILE:-}" ]; then
+    APPCAST_ARGS+=(--ed-key-file "$SPARKLE_ED_KEY_FILE")
+  else
+    APPCAST_ARGS+=(--account piesi)
+  fi
+  "$SPARKLE_BIN/generate_appcast" "${APPCAST_ARGS[@]}" "$DIST"
+  echo "appcast：$DIST/appcast.xml"
 fi
 echo "完成：$DMG"

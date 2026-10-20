@@ -1,4 +1,4 @@
-// SettingsWindowController.swift —— 设置窗口（⌘,）：默认动作、完成后动作、自动退出、设为默认解压工具、Finder 右键菜单开关入口、界面语言入口。存 UserDefaults。
+// SettingsWindowController.swift —— 设置窗口（⌘,）：默认动作、完成后动作、自动退出、设为默认解压工具、Finder 右键菜单开关入口、界面语言入口、自动更新。存 UserDefaults。
 import AppKit
 import SwiftUI
 
@@ -10,7 +10,7 @@ final class SettingsWindowController: NSWindowController {
         // grouped 风格的 Form 没有固有高度，窗口尺寸由这里定，不让 SwiftUI 反推
         hosting.sizingOptions = []
         let window = NSWindow(contentViewController: hosting)
-        window.setContentSize(NSSize(width: 480, height: 610))
+        window.setContentSize(NSSize(width: 480, height: 800))
         window.title = String(localized: "设置")
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
@@ -42,6 +42,9 @@ struct SettingsView: View {
     @State private var settingDefault = false
     /// Finder 右键菜单扩展是否已在系统设置里打开；打开设置页、回到 app 时重读
     @State private var finderMenuEnabled = false
+    /// 自动更新的两个开关，值存在 Sparkle 自己的键里，这里只做镜像
+    @State private var autoCheckUpdates = AppDelegate.shared.updater.automaticallyChecks
+    @State private var autoDownloadUpdates = AppDelegate.shared.updater.automaticallyDownloads
 
     var body: some View {
         Form {
@@ -108,9 +111,28 @@ struct SettingsView: View {
                     }
                 }
             }
+            Section("更新") {
+                Toggle("自动检查更新", isOn: $autoCheckUpdates)
+                    .onChange(of: autoCheckUpdates) { _, value in
+                        AppDelegate.shared.updater.automaticallyChecks = value
+                    }
+                Toggle("自动下载并在退出时安装", isOn: $autoDownloadUpdates)
+                    .onChange(of: autoDownloadUpdates) { _, value in
+                        AppDelegate.shared.updater.automaticallyDownloads = value
+                    }
+                    .disabled(!autoCheckUpdates)
+                HStack {
+                    Text("当前版本 \(AppInfo.version)")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("检查更新…") {
+                        AppDelegate.shared.updater.checkForUpdates()
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 610)
+        .frame(width: 480, height: 800)
         .task {
             finderMenuEnabled = await FinderExtension.isEnabled()
         }
