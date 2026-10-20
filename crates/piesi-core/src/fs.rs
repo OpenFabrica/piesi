@@ -54,6 +54,7 @@ pub struct DirSink {
     root: Dir,
     root_path: PathBuf,
     /// 源压缩包的 quarantine 值：Some 则给每个输出打上同样的值；None 则确保输出没有它
+    #[cfg(target_os = "macos")]
     quarantine: Option<Vec<u8>>,
     /// 延后创建的符号链接：(相对路径, 目标, 元数据)
     pending_links: Vec<(String, Vec<u8>, Meta)>,
@@ -65,11 +66,14 @@ pub struct DirSink {
 impl DirSink {
     /// 打开（必要时创建）目标目录。`quarantine` 传 `read_quarantine(压缩包路径)` 的结果。
     pub fn create(root: &Path, quarantine: Option<Vec<u8>>) -> Result<Self> {
+        #[cfg(not(target_os = "macos"))]
+        let _ = quarantine;
         std::fs::create_dir_all(root)?;
         let dir = Dir::open_ambient_dir(root, ambient_authority())?;
         Ok(Self {
             root: dir,
             root_path: root.to_path_buf(),
+            #[cfg(target_os = "macos")]
             quarantine,
             pending_links: Vec::new(),
             pending_dir_meta: Vec::new(),
@@ -94,6 +98,7 @@ impl DirSink {
 
     /// 给刚写出的文件回写 mtime、权限、quarantine。
     fn apply_file_meta(&self, file: std::fs::File, rel: &str, meta: &Meta) -> Result<()> {
+        #[cfg(unix)]
         if let Some(mode) = meta.mode {
             use std::os::unix::fs::PermissionsExt;
             // 只保留权限位，丢掉文件类型位；同时强制属主可读写，免得解压出一个自己都删不掉的文件
@@ -106,6 +111,25 @@ impl DirSink {
         }
         drop(file);
         self.apply_quarantine(rel)
+    }
+
+    /// 使用受目标目录约束的平台 API 创建链接；Windows 需要区分文件与目录链接。
+    fn create_symlink(&self, target: &str, rel: &str) -> io::Result<()> {
+        #[cfg(not(windows))]
+        {
+            self.root.symlink(target, rel)
+        }
+        #[cfg(windows)]
+        {
+            // NT 重解析点会原样保存目标；正斜杠不会像普通 Win32 路径那样自动转换。
+            let target = target.replace('/', "\\");
+            let resolved = Path::new(rel).parent().unwrap_or(Path::new("")).join(&target);
+            if self.root.is_dir(resolved) {
+                self.root.symlink_dir(&target, rel)
+            } else {
+                self.root.symlink_file(&target, rel)
+            }
+        }
     }
 
     /// 按源压缩包的状态同步输出的 quarantine：有则打上同值，无则去掉。
@@ -218,7 +242,7 @@ impl FileSink for DirSink {
                 self.root.remove_file(&rel)?;
             }
             let target_str = String::from_utf8_lossy(&target).into_owned();
-            match self.root.symlink(&target_str, &rel) {
+            match self.create_symlink(&target_str, &rel) {
                 Ok(()) => {
                     self.report.extracted += 1;
                     self.apply_quarantine(&rel)?;
@@ -235,6 +259,7 @@ impl FileSink for DirSink {
         for (rel, meta) in dirs {
             if let Ok(d) = self.root.open_dir(&rel) {
                 let f = d.into_std_file();
+                #[cfg(unix)]
                 if let Some(mode) = meta.mode {
                     use std::os::unix::fs::PermissionsExt;
                     let _ = f.set_permissions(std::fs::Permissions::from_mode((mode & 0o7777) | 0o700));
@@ -252,11 +277,7 @@ impl FileSink for DirSink {
 /// 用于以后的「编辑压缩包后保存」和写压缩包。
 pub fn atomic_replace(target: &Path, write: impl FnOnce(&mut std::fs::File) -> Result<()>) -> Result<()> {
     let dir = target.parent().ok_or_else(|| Error::Other("目标路径没有父目录".into()))?;
-    let tmp = dir.join(format!(
-        ".{}.piesi-tmp-{}",
-        target.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
-        std::process::id()
-    ));
+    let tmp = dir.join(format!(".{}.piesi-tmp-{}", target.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), std::process::id()));
     let result = (|| {
         let mut f = std::fs::File::create(&tmp)?;
         write(&mut f)?;
@@ -281,20 +302,22 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         let mut sink = DirSink::create(&root, None).unwrap();
         sink.make_dir("a/b", &Meta { mtime: Some(1_600_000_000), mode: Some(0o755) }).unwrap();
-        let n = sink
-            .write_file("a/b/hello.txt", &Meta { mtime: Some(1_600_000_000), mode: Some(0o644) }, &mut &b"hello"[..])
-            .unwrap();
+        let n = sink.write_file("a/b/hello.txt", &Meta { mtime: Some(1_600_000_000), mode: Some(0o644) }, &mut &b"hello"[..]).unwrap();
         assert_eq!(n, 5);
         sink.add_symlink("a/link", b"b/hello.txt", &Meta::default()).unwrap();
+        sink.add_symlink("a/dirlink", b"b", &Meta::default()).unwrap();
         sink.add_symlink("a/evil", b"../../etc/passwd", &Meta::default()).unwrap();
         sink.add_symlink("a/abs", b"/etc/passwd", &Meta::default()).unwrap();
         let report = sink.finish().unwrap();
-        assert_eq!(report.extracted, 2);
+        assert_eq!(report.extracted, 3);
         assert_eq!(report.skipped, 2);
         assert_eq!(std::fs::read_to_string(root.join("a/link")).unwrap(), "hello");
+        assert_eq!(std::fs::read_to_string(root.join("a/dirlink/hello.txt")).unwrap(), "hello");
         assert!(!root.join("a/evil").exists() && std::fs::symlink_metadata(root.join("a/evil")).is_err());
         let mtime = std::fs::metadata(root.join("a/b/hello.txt")).unwrap().modified().unwrap();
         assert_eq!(mtime.duration_since(UNIX_EPOCH).unwrap().as_secs(), 1_600_000_000);
+        // Windows 不允许删除仍被目录能力句柄打开的根目录。
+        drop(sink);
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -306,5 +329,12 @@ mod tests {
         assert!(symlink_escapes("a/b/link", b"../../../x"));
         assert!(symlink_escapes("link", b"/abs"));
         assert!(!symlink_escapes("link", b"./same"));
+        #[cfg(windows)]
+        {
+            assert!(symlink_escapes("a/link", br"C:\outside"));
+            assert!(symlink_escapes("a/link", br"C:outside"));
+            assert!(symlink_escapes("a/link", br"\outside"));
+            assert!(symlink_escapes("a/link", br"\\server\share"));
+        }
     }
 }

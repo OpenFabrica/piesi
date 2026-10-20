@@ -128,6 +128,11 @@ fn walk(path: &Path, rel: &str, opts: &CreateOptions, out: &mut Sources) -> Resu
     let rel = finalize_rel(rel, opts, &mut out.warnings);
     if meta.file_type().is_symlink() {
         let target = std::fs::read_link(path)?;
+        // 包内链接使用正斜杠，确保 Windows 创建的归档在 Unix 上也能正确解析。
+        #[cfg(windows)]
+        let target = target.to_string_lossy().replace('\\', "/");
+        #[cfg(not(windows))]
+        let target = target.to_string_lossy();
         out.items.push(SourceItem {
             rel,
             path: path.to_path_buf(),
@@ -135,7 +140,7 @@ fn walk(path: &Path, rel: &str, opts: &CreateOptions, out: &mut Sources) -> Resu
             size: 0,
             mtime,
             mode,
-            link_target: Some(target.to_string_lossy().as_bytes().to_vec()),
+            link_target: Some(target.as_bytes().to_vec()),
         });
     } else if meta.is_dir() {
         out.items.push(SourceItem { rel: rel.clone(), path: path.to_path_buf(), kind: EntryKind::Dir, size: 0, mtime, mode, link_target: None });

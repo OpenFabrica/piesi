@@ -85,7 +85,7 @@ impl fmt::Display for Warning {
             WarningKind::RarReferenceSkipped => write!(f, "{s}：引用记录（rar -oi）暂不支持，已跳过"),
             WarningKind::NoDataSkipped => write!(f, "{s}：条目没有数据，已跳过"),
             WarningKind::SymlinkEscapeSkipped => write!(f, "跳过越出目标目录的符号链接：{s} -> {d}"),
-            WarningKind::RarSymlinkRejected => write!(f, "{s}：unrar 拒绝还原该符号链接（目标不安全或读取失败），已跳过"),
+            WarningKind::RarSymlinkRejected => write!(f, "{s}：unrar 无法还原该符号链接（平台不支持、目标不安全或读取失败），已跳过"),
             WarningKind::SymlinkCreateFailed => write!(f, "创建符号链接失败：{s}：{d}"),
             WarningKind::RarSkipDecodeError => write!(f, "{s}：跳过时解码出错（{d}），未选中，忽略"),
             WarningKind::SpecialFileSkipped => write!(f, "跳过特殊文件：{s}"),

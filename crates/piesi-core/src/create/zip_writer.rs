@@ -461,45 +461,27 @@ fn dos_datetime(mtime: Option<i64>) -> (u16, u16) {
     (time, date)
 }
 
-/// 把 Unix 秒按本地时区拆成年月日时分秒。不依赖时区库：用 libc::localtime_r 等价的纯算法会很长，
-/// 这里用 `std` 没有的能力，所以借助 `date` 的通用算法：先取时区偏移（由 TZ 环境决定），再做公历换算。
+/// 按系统时区拆分时间；Windows 使用 CRT 的 localtime_s，Unix 使用 localtime_r。
+/// 平台接口拒绝超出范围的时间时回落到 UTC，避免使用未初始化的 tm。
 fn local_components(secs: i64) -> (i32, u32, u32, u32, u32, u32) {
-    let offset = tz_offset_seconds(secs);
-    let t = secs + offset;
-    let days = t.div_euclid(86_400);
-    let rem = t.rem_euclid(86_400);
+    let timestamp = secs as libc::time_t;
+    let mut tm = std::mem::MaybeUninit::<libc::tm>::uninit();
+    // SAFETY：缓冲具有 libc::tm 的平台布局；接口同步初始化它，成功后才读取。
+    #[cfg(unix)]
+    let valid = unsafe { !libc::localtime_r(&timestamp, tm.as_mut_ptr()).is_null() };
+    #[cfg(windows)]
+    let valid = unsafe { libc::localtime_s(tm.as_mut_ptr(), &timestamp) == 0 };
+    #[cfg(not(any(unix, windows)))]
+    let valid = false;
+    if valid {
+        // SAFETY：平台函数返回成功，所有 tm 字段均已初始化。
+        let tm = unsafe { tm.assume_init() };
+        return (tm.tm_year + 1900, (tm.tm_mon + 1) as u32, tm.tm_mday as u32, tm.tm_hour as u32, tm.tm_min as u32, tm.tm_sec as u32);
+    }
+    let days = secs.div_euclid(86_400);
+    let rem = secs.rem_euclid(86_400);
     let (y, m, d) = civil_from_days(days);
     (y, m, d, (rem / 3600) as u32, ((rem % 3600) / 60) as u32, (rem % 60) as u32)
-}
-
-/// 当前时区偏移（秒）。用 libc 的 localtime_r 最准确，但为避免新增依赖，这里读 `TZ`/系统设置的通用做法
-/// 不可行，退而求其次：通过 `std::process` 之外的 C 调用也不行——因此直接用 `time` 系列的 FFI 声明。
-fn tz_offset_seconds(secs: i64) -> i64 {
-    #[repr(C)]
-    struct Tm {
-        tm_sec: i32,
-        tm_min: i32,
-        tm_hour: i32,
-        tm_mday: i32,
-        tm_mon: i32,
-        tm_year: i32,
-        tm_wday: i32,
-        tm_yday: i32,
-        tm_isdst: i32,
-        tm_gmtoff: i64,
-        tm_zone: *const u8,
-    }
-    extern "C" {
-        fn localtime_r(t: *const i64, out: *mut Tm) -> *mut Tm;
-    }
-    let mut tm = std::mem::MaybeUninit::<Tm>::uninit();
-    // SAFETY：localtime_r 是线程安全的 POSIX 函数，入参指针有效；macOS/Linux 的 struct tm 布局与上面一致
-    unsafe {
-        if localtime_r(&secs, tm.as_mut_ptr()).is_null() {
-            return 0;
-        }
-        tm.assume_init().tm_gmtoff
-    }
 }
 
 /// 天数（自 1970-01-01）转公历日期，Howard Hinnant 的算法。

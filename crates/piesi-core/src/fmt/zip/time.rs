@@ -48,8 +48,7 @@ pub fn filetime_to_unix(ft: u64) -> Option<i64> {
     secs.checked_sub(FILETIME_EPOCH_DIFF)
 }
 
-/// 本地时间 → Unix 秒。Unix 平台交给 libc 的 `mktime`（它懂时区数据库与夏令时），
-/// 其它平台退化为按 UTC 计算。
+/// 本地时间 → Unix 秒。Unix 平台交给 libc 的 `mktime`，使用系统时区与夏令时规则。
 #[cfg(unix)]
 fn local_to_unix(year: i32, month: u32, day: u32, hour: u32, minute: u32, second: u32) -> Option<i64> {
     use std::ffi::{c_char, c_int, c_long};
@@ -97,8 +96,28 @@ fn local_to_unix(year: i32, month: u32, day: u32, hour: u32, minute: u32, second
     Some(t as i64)
 }
 
-/// 非 Unix 平台：按 UTC 计算（Howard Hinnant 的 days_from_civil）。
-#[cfg(not(unix))]
+/// Windows 使用 64 位 CRT 时间接口，保持 DOS 时间的本地时区语义。
+#[cfg(windows)]
+fn local_to_unix(year: i32, month: u32, day: u32, hour: u32, minute: u32, second: u32) -> Option<i64> {
+    extern "C" {
+        fn _mktime64(tm: *mut libc::tm) -> i64;
+    }
+    // SAFETY：libc::tm 的字段均可用零初始化，以下再补齐日期及夏令时推断标记。
+    let mut tm = unsafe { std::mem::zeroed::<libc::tm>() };
+    tm.tm_year = year - 1900;
+    tm.tm_mon = month as i32 - 1;
+    tm.tm_mday = day as i32;
+    tm.tm_hour = hour as i32;
+    tm.tm_min = minute as i32;
+    tm.tm_sec = second as i32;
+    tm.tm_isdst = -1;
+    // SAFETY：CRT 在同步调用期间读写有效的、具有 Windows 布局的 tm。
+    let result = unsafe { _mktime64(&mut tm) };
+    (result != -1).then_some(result)
+}
+
+/// 其它平台：按 UTC 计算（Howard Hinnant 的 days_from_civil）。
+#[cfg(not(any(unix, windows)))]
 fn local_to_unix(year: i32, month: u32, day: u32, hour: u32, minute: u32, second: u32) -> Option<i64> {
     Some(utc_to_unix(year, month, day, hour, minute, second))
 }

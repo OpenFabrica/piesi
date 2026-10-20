@@ -35,3 +35,16 @@
 
 只认数字的字段（Info.plist、DMG 文件名里的版本）：在构建脚本里去掉后缀再传，不改源码里的版本号。
 Rust 与 Xcode 两处版本号必须一致，`scripts/package.sh` 开头校验。
+
+## 3. Windows / Linux CLI 独立发布
+
+CLI 使用 `cli-v<版本>` 标签，避免触发 macOS 签名公证流程。源码里的 Rust / Xcode 版本继续同步，
+正式发布后一起推进到下一个开发版。CLI 标签同样必须位于 main、版本与标签一致、工作区干净。
+
+1. 确认 main 上 `cli-release` 的 Windows / Linux 构建、测试及安装卸载验证通过。
+2. 去掉 Rust 与 Xcode 的开发标记，在 CHANGELOG 顶部写明此次 CLI 发版，提交后合并到 main 并推送。
+3. 打注释标签 `cli-v<版本>` 并推送。工作流再次验证正式版本，全部通过后上传五个安装/便携包和 SHA-256 清单。
+4. 发布设置 `--latest=false`，保留 macOS 的 latest Release 与 appcast.xml；不修改既有标签或资产。
+5. 标签推出去后，按通用规则立即提交并推送下一个开发版。
+
+当前包的格式、系统要求、验证流程和本机打包入口见 [CLI 帮助](cli.md)。
