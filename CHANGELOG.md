@@ -2,6 +2,15 @@
 
 未发布的改动不写在这里；发版时按 `docs/release.md` 在顶部加一节。
 
+## 0.1.1 · 2026-10-20 · beta（Windows / Linux CLI）
+
+- 新增 Windows x64 命令行安装程序与便携 ZIP；支持当前用户安装、添加 PATH 与卸载清理
+- 新增 Linux x86_64 的 DEB、RPM 安装包及 tar.gz 便携包，提供 SHA-256 校验清单
+- Windows / Linux 与 macOS 共用压缩引擎，支持中文文件名、压缩、解压、加密与校验
+- 修正 Windows 的 Unix 权限依赖与符号链接创建，保留安全解压边界
+- 安装包经过 Windows、Ubuntu 和 Fedora 容器中的实际安装、命令执行与卸载验证
+- 此次只发布命令行版；Windows 需要 Windows 10/11 x64，Linux 需要 glibc 2.35 或更新版本
+
 ## 0.1.0 · 2026-10-20 · beta
 
 - 双击压缩包直接解压到旁边；按住 ⌥ 双击先浏览内容
