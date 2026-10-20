@@ -1,0 +1,40 @@
+{
+  "fill" : {
+    "automatic-gradient" : "extended-srgb:1.00000,0.58431,0.00000,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "pull.svg",
+          "name" : "pull"
+        },
+        {
+          "glass" : false,
+          "image-name" : "zipper.svg",
+          "name" : "zipper"
+        },
+        {
+          "glass" : true,
+          "image-name" : "pouch.svg",
+          "name" : "pouch"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
+}

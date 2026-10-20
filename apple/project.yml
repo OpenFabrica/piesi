@@ -44,6 +44,12 @@ targets:
       Release: Config/Version.xcconfig
     sources:
       - path: Piesi
+        excludes:
+          - AppIcon.icon
+      # Icon Composer 图标是个目录包，xcodegen 不认识这个扩展名，会拆开当普通资源；这里按单个文件加进去
+      - path: Piesi/AppIcon.icon
+        type: file
+        buildPhase: resources
       # 和 Quick Look 扩展共用的代码（核心错误的本地化文案）
       - path: Shared
       # uniffi 生成的 Swift 绑定，scripts/build-core.sh 产出
@@ -58,6 +64,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.citrolabs.piesi
         PRODUCT_NAME: Piesi
+        # 图标是 Icon Composer 格式（Piesi/AppIcon.icon，图层由 Icon/gen-icon-layers.py 生成）；
+        # actool 编进 Assets.car，并给 macOS 14/15 生成 AppIcon.icns
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_FILE: Piesi/Info.plist
         CODE_SIGN_ENTITLEMENTS: Piesi/Piesi.entitlements
 

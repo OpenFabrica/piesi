@@ -200,6 +200,8 @@
 
 ### 6.5 分发
 - 最低 macOS 14（SDK 26 编译，在 26 上自动用 Liquid Glass 外观）。
+- 图标：`apple/Piesi/AppIcon.icon`（Icon Composer 格式：橙色渐变底 + 白卡片上拉开的拉链，图层 SVG 由 `apple/Icon/gen-icon-layers.py` 生成）。actool 编进 Assets.car 给 macOS 26+ 用液态玻璃效果，同时生成 `AppIcon.icns` 给 macOS 14/15。xcodegen 不认 `.icon`，`project.yml` 里按单个文件加进资源阶段。
+- DMG：`scripts/dmg/`。dmgbuild（锁版本，装在 `target/dmgbuild-venv`）直接写 .DS_Store：640×400 窗口、背景 `background.tiff`（由 `background.svg` 经 `render-background.sh` 渲染 1x+2x）、app 与 Applications 图标位置、卷图标，LZFSE 压缩（ULFO）。
 - Developer ID 签名 + 公证 + staple，按 `~/.claude/docs/apple-signing.md`（profile `aster-notary`）。
 - 发版规范按 `~/.claude/docs/release-versioning.md` 写进 `docs/release.md`（只写 Rust + Swift/Xcode 两行）。
 

@@ -61,10 +61,16 @@ codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 DMG="$DIST/Piesi-$PKG_VER.dmg"
-STAGE="$DIST/dmg-stage"
-mkdir -p "$STAGE" && cp -R "$APP" "$STAGE/" && ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Piesi" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
-rm -rf "$STAGE"
+# DMG 窗口（背景、图标位置、卷图标）由 dmgbuild 直接写 .DS_Store，配置在 scripts/dmg/；
+# dmgbuild 及其依赖锁版本，装在 target/ 下的 venv 里，不碰系统 Python
+VENV="$ROOT/target/dmgbuild-venv"
+if [ ! -x "$VENV/bin/dmgbuild" ]; then
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install -q "dmgbuild==1.6.7" "ds_store==1.3.3" "mac_alias==2.2.3"
+fi
+"$VENV/bin/dmgbuild" -s scripts/dmg/dmg-settings.py \
+  -D app="$APP" -D icon="$APP/Contents/Resources/AppIcon.icns" -D background="$ROOT/scripts/dmg/background.tiff" \
+  "Piesi" "$DMG"
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 
 if [ "${SKIP_NOTARIZE:-0}" != "1" ]; then
