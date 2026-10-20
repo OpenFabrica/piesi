@@ -8,6 +8,7 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import tomllib
@@ -16,7 +17,11 @@ import zipfile
 
 def run(*args: str, **kwargs) -> str:
     """执行打包工具，保留失败退出码并返回标准输出。"""
-    return subprocess.check_output(args, text=True, **kwargs).strip()
+    try:
+        return subprocess.check_output(args, text=True, **kwargs).strip()
+    except subprocess.CalledProcessError as error:
+        print(error.output, file=sys.stderr)
+        raise
 
 
 def package_linux(root: Path, stage: Path, out: Path, version: str) -> list[Path]:

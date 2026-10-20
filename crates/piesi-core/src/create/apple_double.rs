@@ -25,7 +25,9 @@
 
 use std::path::Path;
 
-use crate::warning::{Warning, WarningKind};
+use crate::warning::Warning;
+#[cfg(target_os = "macos")]
+use crate::warning::WarningKind;
 
 /// Finder Info 固定 32 字节。
 pub const FINDER_INFO_LEN: usize = 32;
@@ -44,6 +46,7 @@ const ATTR_HEADER_OFFSET: usize = FINDER_INFO_OFFSET + FINDER_INFO_LEN + 2;
 /// attr_entry 表的起点：ATTR 头固定 36 字节。
 const ATTR_ENTRIES_OFFSET: usize = ATTR_HEADER_OFFSET + 36;
 /// XNU 规定 ATTR 头 + 条目表必须放进 64 KB（数据区不限），超过的属性只能丢掉。
+#[cfg(target_os = "macos")]
 const ATTR_MAX_HDR_SIZE: usize = 65_536;
 
 /// 一个文件或目录的 Mac 元数据：Finder 信息、扩展属性（已剔除 quarantine、资源分支、Finder 信息本身）、资源分支。

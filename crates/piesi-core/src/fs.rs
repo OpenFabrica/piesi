@@ -303,12 +303,14 @@ mod tests {
         let n = sink.write_file("a/b/hello.txt", &Meta { mtime: Some(1_600_000_000), mode: Some(0o644) }, &mut &b"hello"[..]).unwrap();
         assert_eq!(n, 5);
         sink.add_symlink("a/link", b"b/hello.txt", &Meta::default()).unwrap();
+        sink.add_symlink("a/dirlink", b"b", &Meta::default()).unwrap();
         sink.add_symlink("a/evil", b"../../etc/passwd", &Meta::default()).unwrap();
         sink.add_symlink("a/abs", b"/etc/passwd", &Meta::default()).unwrap();
         let report = sink.finish().unwrap();
-        assert_eq!(report.extracted, 2);
+        assert_eq!(report.extracted, 3);
         assert_eq!(report.skipped, 2);
         assert_eq!(std::fs::read_to_string(root.join("a/link")).unwrap(), "hello");
+        assert_eq!(std::fs::read_to_string(root.join("a/dirlink/hello.txt")).unwrap(), "hello");
         assert!(!root.join("a/evil").exists() && std::fs::symlink_metadata(root.join("a/evil")).is_err());
         let mtime = std::fs::metadata(root.join("a/b/hello.txt")).unwrap().modified().unwrap();
         assert_eq!(mtime.duration_since(UNIX_EPOCH).unwrap().as_secs(), 1_600_000_000);
@@ -323,5 +325,12 @@ mod tests {
         assert!(symlink_escapes("a/b/link", b"../../../x"));
         assert!(symlink_escapes("link", b"/abs"));
         assert!(!symlink_escapes("link", b"./same"));
+        #[cfg(windows)]
+        {
+            assert!(symlink_escapes("a/link", br"C:\outside"));
+            assert!(symlink_escapes("a/link", br"C:outside"));
+            assert!(symlink_escapes("a/link", br"\outside"));
+            assert!(symlink_escapes("a/link", br"\\server\share"));
+        }
     }
 }
