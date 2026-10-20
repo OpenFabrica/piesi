@@ -11,6 +11,8 @@ struct CompressOptions: Sendable {
     var encryptNames: Bool
     var skipJunk: Bool
     var windowsSafe: Bool
+    /// 保留 Finder 标签、xattr、资源分支（写成 __MACOSX/._ AppleDouble，和 ditto 一致）；只有 zip 支持
+    var macMetadata: Bool
 }
 
 /// 压缩流程协调器。
@@ -48,7 +50,8 @@ final class CompressCoordinator {
             password: options.password,
             encryptNames: options.encryptNames,
             skipJunk: options.skipJunk,
-            windowsSafe: options.windowsSafe
+            windowsSafe: options.windowsSafe,
+            macMetadata: options.macMetadata
         )
         let item = TaskItem(kind: .create, title: name, totalBytes: nil)
         taskCenter.add(item)

@@ -25,7 +25,7 @@ enum CompressPreset: CaseIterable, Identifiable {
         case .windows: "ZIP · Windows 安全文件名"
         case .smallest: "7z · 级别 7"
         case .encrypted: "7z · 密码 + 文件名加密"
-        case .mac: "ZIP · 级别 5"
+        case .mac: "ZIP · 保留 Finder 标签等 Mac 元数据"
         }
     }
 
@@ -56,6 +56,11 @@ enum CompressPreset: CaseIterable, Identifiable {
     var encryptNames: Bool {
         self == .encrypted
     }
+
+    /// 只有「Mac 专用」写 __MACOSX/._ 元数据；发给 Windows 的包里它们只是垃圾
+    var macMetadata: Bool {
+        self == .mac
+    }
 }
 
 /// 对话框入口。
@@ -81,6 +86,7 @@ struct CompressDialogView: View {
     @State private var encryptNames = false
     @State private var skipJunk = true
     @State private var windowsSafe = true
+    @State private var macMetadata = false
     @State private var baseName: String
     @State private var directory: URL
     @State private var showAdvanced = false
@@ -95,11 +101,12 @@ struct CompressDialogView: View {
         _baseName = State(initialValue: name.isEmpty ? "压缩包" : name)
     }
 
-    /// 当前高亮的预设：按格式 / 级别 / 安全名 / 文件名加密反推，哪张卡片的值全对上就是哪张。
+    /// 当前高亮的预设：按格式 / 级别 / 安全名 / 文件名加密 / Mac 元数据反推，哪张卡片的值全对上就是哪张。
     /// 不用 @State 存：之前 apply() 先改值再设 preset，各个 onChange 在下一轮视图更新才跑，最后把 preset 清成了 nil。
     private var preset: CompressPreset? {
         CompressPreset.allCases.first {
-            $0.format == format && Int($0.level) == Int(level) && $0.windowsSafe == windowsSafe && $0.encryptNames == encryptNames
+            $0.format == format && Int($0.level) == Int(level) && $0.windowsSafe == windowsSafe
+                && $0.encryptNames == encryptNames && $0.macMetadata == macMetadata
         }
     }
 
@@ -301,15 +308,21 @@ struct CompressDialogView: View {
                 Text("")
                 Toggle("文件名改成 Windows 安全名", isOn: $windowsSafe)
             }
+            GridRow {
+                Text("")
+                Toggle("保留 Mac 元数据（Finder 标签、资源分支，写进 __MACOSX）", isOn: $macMetadata)
+                    .disabled(format != .zip)
+            }
         }
     }
 
-    /// 套预设：格式、级别、安全名、文件名加密；非加密预设清掉密码，加密预设展开「高级」让用户填密码。
+    /// 套预设：格式、级别、安全名、文件名加密、Mac 元数据；非加密预设清掉密码，加密预设展开「高级」让用户填密码。
     private func apply(_ candidate: CompressPreset) {
         format = candidate.format
         level = candidate.level
         windowsSafe = candidate.windowsSafe
         encryptNames = candidate.encryptNames
+        macMetadata = candidate.macMetadata
         if candidate != .encrypted {
             password = ""
             passwordConfirm = ""
@@ -351,7 +364,9 @@ struct CompressDialogView: View {
             password: password.isEmpty ? nil : password,
             encryptNames: encryptNames && format == .sevenZ && !password.isEmpty,
             skipJunk: skipJunk,
-            windowsSafe: windowsSafe
+            windowsSafe: windowsSafe,
+            // 开关在非 zip 下是禁用的，但值可能还留着 true（先选 Mac 专用再改成 7z）；Rust 对 7z 会忽略，这里也不传
+            macMetadata: macMetadata && format == .zip
         )
         finish(options)
     }
