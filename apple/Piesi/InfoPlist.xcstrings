@@ -1,5 +1,5 @@
 {
-  "sourceLanguage": "zh-Hans",
+  "sourceLanguage": "en",
   "strings": {
     "NSDesktopFolderUsageDescription": {
       "localizations": {
@@ -99,6 +99,12 @@
             "value": "Piesi で圧縮"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Piesi 压缩"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -121,6 +127,12 @@
             "value": "Piesi で表示"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Piesi 查看"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -141,6 +153,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Piesi でここに展開"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Piesi 解压到此处"
           }
         },
         "zh-Hant": {

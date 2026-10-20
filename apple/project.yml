@@ -8,8 +8,9 @@ options:
   xcodeVersion: "27.0"
   createIntermediateGroups: true
   groupSortPosition: top
-  # 开发语言简体中文：代码里的文案就是 zh-Hans 原文，Localizable.xcstrings 只放 zh-Hant / en / ja 的翻译
-  developmentLanguage: zh-Hans
+  # 代码里的文案字面量是简体原文，同时当 String Catalog 的键；四种语言都明写在 .xcstrings 里。
+  # 开发语言（回落语言）设成 en：没覆盖的语言（德语、韩语…）看到英文，而不是中文键。
+  developmentLanguage: en
 
 # 版本号只存 Config/Version.xcconfig 一处（docs/release.md 第 4 条）
 configFiles:

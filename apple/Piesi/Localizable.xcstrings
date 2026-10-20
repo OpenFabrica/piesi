@@ -1,5 +1,5 @@
 {
-  "sourceLanguage": "zh-Hans",
+  "sourceLanguage": "en",
   "strings": {
     "\n…还有 %lld 个": {
       "localizations": {
@@ -13,6 +13,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "\n…ほか %lld 個"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\n…还有 %lld 个"
           }
         },
         "zh-Hant": {
@@ -37,6 +43,12 @@
             "value": "%@ ファイル"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 文件"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -57,6 +69,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ など %2$lld 項目"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 等 %lld 项"
           }
         },
         "zh-Hant": {
@@ -81,6 +99,12 @@
             "value": "%@：unrar がシンボリックリンクの復元を拒否（安全でないリンク先または読み取り失敗）、スキップ"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：unrar 拒绝还原该符号链接（目标不安全或读取失败），已跳过"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -101,6 +125,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@：参照レコード（rar -oi）は未対応のためスキップ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：引用记录（rar -oi）暂不支持，已跳过"
           }
         },
         "zh-Hant": {
@@ -125,6 +155,12 @@
             "value": "%@：データがないためスキップ"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：条目没有数据，已跳过"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -145,6 +181,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@：ハードリンクは未対応のためスキップ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：硬链接暂不支持，已跳过"
           }
         },
         "zh-Hant": {
@@ -169,6 +211,12 @@
             "value": "%@：デバイスファイルまたはパイプのためスキップ"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：设备文件或管道，已跳过"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -189,6 +237,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@：スキップ中にデコードエラー（%2$@）、無視しました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：跳过时解码出错（%@），已忽略"
           }
         },
         "zh-Hant": {
@@ -213,6 +267,12 @@
             "value": "%lld 項目"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个条目"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -233,6 +293,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 種類のアーカイブがデフォルトで Piesi で開くようになりました。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 种压缩包类型现在默认用 Piesi 打开。"
           }
         },
         "zh-Hant": {
@@ -257,6 +323,12 @@
             "value": "7z · パスワード + ファイル名の暗号化"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7z · 密码 + 文件名加密"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -277,6 +349,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "7z · レベル 7"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7z · 级别 7"
           }
         },
         "zh-Hant": {
@@ -301,6 +379,12 @@
             "value": "Big5（繁体字中国語）"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Big5（繁体中文）"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -321,6 +405,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "CP1251（キリル文字）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CP1251（西里尔）"
           }
         },
         "zh-Hant": {
@@ -345,6 +435,12 @@
             "value": "CP1252（西ヨーロッパ言語）"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CP1252（西欧）"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -365,6 +461,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "CP866（DOS キリル文字）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CP866（DOS 西里尔）"
           }
         },
         "zh-Hant": {
@@ -389,6 +491,12 @@
             "value": "EUC-KR（韓国語）"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "EUC-KR（韩文）"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -409,6 +517,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "GB18030（簡体字中国語）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GB18030（简体中文）"
           }
         },
         "zh-Hant": {
@@ -433,6 +547,12 @@
             "value": "Mac 専用"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 专用"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -453,6 +573,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Shift_JIS（日本語）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shift_JIS（日文）"
           }
         },
         "zh-Hant": {
@@ -477,6 +603,12 @@
             "value": "ZIP · Windows で安全なファイル名"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ZIP · Windows 安全文件名"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -497,6 +629,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ZIP · レベル 5"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ZIP · 级别 5"
           }
         },
         "zh-Hant": {
@@ -521,10 +659,44 @@
             "value": "ZIP ではファイル名を暗号化できません（7z のみ）。ファイル名は暗号化されていません"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "zip 不能加密文件名（只有 7z 可以），文件名未加密"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
             "value": "zip 不能加密檔名（只有 7z 可以），檔名未加密"
+          }
+        }
+      }
+    },
+    "、": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", "
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "、"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "、"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "、"
           }
         }
       }
@@ -541,6 +713,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」は圧縮爆弾の可能性があります"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」可能是压缩炸弹"
           }
         },
         "zh-Hant": {
@@ -565,6 +743,12 @@
             "value": "「%@」の検証に失敗しました"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」校验失败"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -585,6 +769,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」のファイル名のエンコーディングを特定できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」的文件名编码不确定"
           }
         },
         "zh-Hant": {
@@ -609,6 +799,12 @@
             "value": "「%@」にはパスワードが必要です"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」需要密码"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -629,6 +825,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "暗号化しない"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不加密"
           }
         },
         "zh-Hant": {
@@ -653,6 +855,12 @@
             "value": "安全でないパス：%@"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不安全的路径：%@"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -673,6 +881,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "非対応：%@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支持：%@"
           }
         },
         "zh-Hant": {
@@ -697,6 +911,12 @@
             "value": "パスワードが一致しません"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两次输入不一致"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -717,6 +937,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "中断して終了"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中断并退出"
           }
         },
         "zh-Hant": {
@@ -741,6 +967,12 @@
             "value": "今後 zip、7z、rar、tar などのアーカイブをダブルクリックすると Piesi で展開します。設定でいつでも変更できます。"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "之后双击 zip、7z、rar、tar 等压缩包会直接用 Piesi 解压。随时可以在设置里改。"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -761,6 +993,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "後で"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以后再说"
           }
         },
         "zh-Hant": {
@@ -785,6 +1023,12 @@
             "value": "タスク"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -805,6 +1049,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "場所"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置"
           }
         },
         "zh-Hant": {
@@ -829,6 +1079,12 @@
             "value": "更新日時"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改时间"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -849,6 +1105,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "先に内容を表示"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先浏览内容"
           }
         },
         "zh-Hant": {
@@ -873,6 +1135,12 @@
             "value": "すべてを選択"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全选"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -893,6 +1161,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "すべてを表示"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部显示"
           }
         },
         "zh-Hant": {
@@ -917,6 +1191,12 @@
             "value": "すべてを展開…"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部解压到…"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -937,6 +1217,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Piesi について"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关于 Piesi"
           }
         },
         "zh-Hant": {
@@ -961,6 +1247,12 @@
             "value": "ウインドウを閉じる"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭窗口"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -981,6 +1273,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "もう一度入力"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再输一次"
           }
         },
         "zh-Hant": {
@@ -1005,6 +1303,12 @@
             "value": "準備中…"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备中…"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1025,6 +1329,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」を作成できませんでした"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建「%@」失败"
           }
         },
         "zh-Hant": {
@@ -1049,6 +1359,12 @@
             "value": "シンボリックリンク %1$@ を作成できません：%2$@"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建符号链接失败：%@：%@"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1069,6 +1385,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "削除"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除"
           }
         },
         "zh-Hant": {
@@ -1093,6 +1415,12 @@
             "value": "すべてを手前に移動"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前置全部窗口"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1113,6 +1441,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "カット"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剪切"
           }
         },
         "zh-Hant": {
@@ -1137,6 +1471,12 @@
             "value": "暗号化"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加密"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1157,6 +1497,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "アーカイブは %1$@ しかありませんが展開すると %2$@ になり、ディスクの空き %3$@ を超えます。中止しました。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "包只有 %@，展开却要 %@，超过磁盘剩余的 %@。已停止。"
           }
         },
         "zh-Hant": {
@@ -1181,6 +1527,12 @@
             "value": "圧縮"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1201,6 +1553,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 項目を圧縮"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩 %lld 个项目"
           }
         },
         "zh-Hant": {
@@ -1225,6 +1583,12 @@
             "value": "アーカイブ"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩包"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1245,6 +1609,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "アーカイブは設定に従って展開または表示（⌥ を押していれば常に表示）、ほかのファイルは新規アーカイブを作成します"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩包按设置直接解压或先浏览（按住 ⌥ 一律浏览）；普通文件会新建压缩包"
           }
         },
         "zh-Hant": {
@@ -1269,6 +1639,12 @@
             "value": "アーカイブが壊れています：%@"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩包损坏：%@"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1289,6 +1665,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "圧縮後"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩后"
           }
         },
         "zh-Hant": {
@@ -1313,6 +1695,12 @@
             "value": "アーカイブをダブルクリックしたとき"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双击压缩包"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1333,6 +1721,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Windows 向け"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发给 Windows"
           }
         },
         "zh-Hant": {
@@ -1357,6 +1751,12 @@
             "value": "キャンセル"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1377,6 +1777,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "同名のファイルがあるため「%@」として保存します"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同名文件已存在，将保存为「%@」"
           }
         },
         "zh-Hant": {
@@ -1401,6 +1807,12 @@
             "value": "名前"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名称"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1421,6 +1833,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ファイルを開くために起動した場合、すべてのタスクの完了後に自動的に終了"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "因打开文件而启动时，任务全部完成后自动退出"
           }
         },
         "zh-Hant": {
@@ -1445,6 +1863,12 @@
             "value": "結果を Finder に表示"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Finder 中显示结果"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1465,6 +1889,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "サイズ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大小"
           }
         },
         "zh-Hant": {
@@ -1489,6 +1919,12 @@
             "value": "大文字小文字の衝突：%1$@ を %2$@ に変更"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大小写冲突：%@ 改名为 %@"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1509,6 +1945,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "失敗"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失败"
           }
         },
         "zh-Hant": {
@@ -1533,6 +1975,12 @@
             "value": "OK"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "好"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1553,6 +2001,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "完了"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
           }
         },
         "zh-Hant": {
@@ -1577,6 +2031,12 @@
             "value": "完了後"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成后"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1597,6 +2057,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "パスワード"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密码"
           }
         },
         "zh-Hant": {
@@ -1621,6 +2087,12 @@
             "value": "パスワード保護"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密码保护"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1641,6 +2113,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "パスワードが違います"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密码错误"
           }
         },
         "zh-Hant": {
@@ -1665,6 +2143,12 @@
             "value": "パスワードが違います。もう一度入力してください。"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密码错误，请重新输入。"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1685,6 +2169,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "小さい"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小"
           }
         },
         "zh-Hant": {
@@ -1709,6 +2199,12 @@
             "value": "キャンセルしました"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1729,6 +2225,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Windows 互換のため名前を変更：%1$@ → %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已改名以兼容 Windows：%@ → %@"
           }
         },
         "zh-Hant": {
@@ -1753,6 +2255,12 @@
             "value": "デフォルトの展開ツールに設定しました"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已设为默认解压工具"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1773,6 +2281,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 項目を選択中"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选 %lld 项"
           }
         },
         "zh-Hant": {
@@ -1797,6 +2311,12 @@
             "value": "ヘルプ"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帮助"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1817,6 +2337,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "速い"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快"
           }
         },
         "zh-Hant": {
@@ -1841,6 +2367,12 @@
             "value": "成功 %1$lld 種類、失敗：%2$@"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "成功 %lld 种，失败：%@"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1861,6 +2393,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "すべての項目を正常にデコードし、CRC も一致しました。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有条目解码和 CRC 都正常。"
           }
         },
         "zh-Hant": {
@@ -1885,6 +2423,12 @@
             "value": "手動"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1905,6 +2449,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "アーカイブを開く…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开压缩包…"
           }
         },
         "zh-Hant": {
@@ -1929,6 +2479,12 @@
             "value": "Piesi をデフォルトの展開ツールにしますか？"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把 Piesi 设为默认的解压工具？"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1949,6 +2505,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "アーカイブやファイルをここにドロップ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把压缩包或文件拖到这里"
           }
         },
         "zh-Hant": {
@@ -1973,6 +2535,12 @@
             "value": "コピー"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷贝"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -1993,6 +2561,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "⌥ キーを押しながらダブルクリックすると常に先に内容を表示します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⌥ 双击总是先浏览。"
           }
         },
         "zh-Hant": {
@@ -2017,6 +2591,12 @@
             "value": "検索"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2037,6 +2617,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "取り消す"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "撤销"
           }
         },
         "zh-Hant": {
@@ -2061,6 +2647,12 @@
             "value": "名前を変更"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改名"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2081,6 +2673,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "「名前を変更」では展開するファイルに番号を付け、既存のファイルはそのまま残します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改名会给新解出的文件加上序号，已有文件不动。"
           }
         },
         "zh-Hant": {
@@ -2105,6 +2703,12 @@
             "value": "ファイル"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2125,6 +2729,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ファイル名"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件名"
           }
         },
         "zh-Hant": {
@@ -2149,6 +2759,12 @@
             "value": "ファイル名を Windows で安全な名前にする"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件名改成 Windows 安全名"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2169,6 +2785,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ファイル名のエンコーディング"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件名编码"
           }
         },
         "zh-Hant": {
@@ -2193,6 +2815,12 @@
             "value": "ファイル名のエンコーディング：%1$@（%2$@）"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件名编码：%@（%@）"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2213,6 +2841,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "フォルダ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件夹"
           }
         },
         "zh-Hant": {
@@ -2237,6 +2871,12 @@
             "value": "新規アーカイブ"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建压缩包"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2257,6 +2897,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "新規アーカイブ…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建压缩包…"
           }
         },
         "zh-Hant": {
@@ -2281,6 +2927,12 @@
             "value": "開けません"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2301,6 +2953,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」を開けません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开「%@」"
           }
         },
         "zh-Hant": {
@@ -2325,6 +2983,12 @@
             "value": "「%@」を検証できませんでした"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法校验「%@」"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2345,6 +3009,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」を展開できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法解压「%@」"
           }
         },
         "zh-Hant": {
@@ -2369,6 +3039,12 @@
             "value": "認識できないアーカイブ形式です"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法识别的压缩格式"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2389,6 +3065,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」をプレビューできません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法预览「%@」"
           }
         },
         "zh-Hant": {
@@ -2413,6 +3095,12 @@
             "value": "最小サイズ"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最小体积"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2433,6 +3121,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "しまう"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最小化"
           }
         },
         "zh-Hant": {
@@ -2457,6 +3151,12 @@
             "value": "%lld 件のタスクが実行中です"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有 %lld 个任务正在进行"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2477,6 +3177,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "サービス"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务"
           }
         },
         "zh-Hant": {
@@ -2501,6 +3207,12 @@
             "value": "検証に成功：%llu 項目"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "校验通过：%llu 项"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2521,6 +3233,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "形式"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "格式"
           }
         },
         "zh-Hant": {
@@ -2545,6 +3263,12 @@
             "value": "開いています…"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在打开…"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2565,6 +3289,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ファイルを受け取れませんでした"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有收到文件"
           }
         },
         "zh-Hant": {
@@ -2589,6 +3319,12 @@
             "value": "実行中のタスクはありません"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有进行中的任务"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2609,6 +3345,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "テスト"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "测试"
           }
         },
         "zh-Hant": {
@@ -2633,6 +3375,12 @@
             "value": "今終了するとこれらのタスクが中断され、書き出し済みのファイルが不完全になる可能性があります。"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现在退出会中断这些任务，已写出的文件可能不完整。"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2653,6 +3401,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "同じ名前の項目が %lld 個すでにあります"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标位置已有 %lld 个同名项目"
           }
         },
         "zh-Hant": {
@@ -2677,6 +3431,12 @@
             "value": "アーカイブの隣に展開"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接解压到压缩包旁边"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2697,6 +3457,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "OK"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定"
           }
         },
         "zh-Hant": {
@@ -2721,6 +3487,12 @@
             "value": "パスワードの確認"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认密码"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2741,6 +3513,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ディスクの空き容量が不足しています"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "磁盘空间不足"
           }
         },
         "zh-Hant": {
@@ -2765,6 +3543,12 @@
             "value": "ディスクの空き容量が不足しています：必要 %1$@、空き %2$@"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "磁盘空间不足：需要 %@，可用 %@"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2785,6 +3569,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ウインドウ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "窗口"
           }
         },
         "zh-Hant": {
@@ -2809,6 +3599,12 @@
             "value": "シンボリックリンク"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "符号链接"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2829,6 +3625,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "種類"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "类型"
           }
         },
         "zh-Hant": {
@@ -2853,6 +3655,12 @@
             "value": "ペースト"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粘贴"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2873,6 +3681,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "システム"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统"
           }
         },
         "zh-Hant": {
@@ -2897,6 +3711,12 @@
             "value": "レベル"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "级别"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2917,6 +3737,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "続ける"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续"
           }
         },
         "zh-Hant": {
@@ -2941,6 +3767,12 @@
             "value": "編集"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -2961,6 +3793,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "拡大/縮小"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缩放"
           }
         },
         "zh-Hant": {
@@ -2985,6 +3823,12 @@
             "value": "自動"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3005,6 +3849,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ と推定（信頼度 %2$lld%%）。右側のファイル名が正しく見えるエンコーディングを選んでください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动识别为 %@，置信度 %lld%%。选一个让右边文件名看起来正常的编码。"
           }
         },
         "zh-Hant": {
@@ -3029,6 +3879,12 @@
             "value": "上書き"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "覆盖"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3049,6 +3905,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "展開したファイルが想定の場所にありません：%@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解出的文件不在预期位置：%@"
           }
         },
         "zh-Hant": {
@@ -3073,6 +3935,12 @@
             "value": "展開"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3093,6 +3961,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」の展開に失敗しました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压「%@」失败"
           }
         },
         "zh-Hant": {
@@ -3117,6 +3991,12 @@
             "value": "「%1$@」の展開には %2$@ 必要ですが、展開先のボリュームには %3$@ しか残っていません。"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压「%@」需要 %@，目标卷只剩 %@。"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3137,6 +4017,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ここに展開"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压到此处"
           }
         },
         "zh-Hant": {
@@ -3161,6 +4047,12 @@
             "value": "展開後にアーカイブをゴミ箱に入れる"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压完成后把压缩包移到废纸篓"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3181,6 +4073,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "選択した %lld 項目を展開…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压选中的 %lld 项到…"
           }
         },
         "zh-Hant": {
@@ -3205,6 +4103,12 @@
             "value": "書き込まずにデコードして CRC を検証"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解码并校验 CRC，不写盘"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3225,6 +4129,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "zip、7z、rar、tar などのアーカイブをデフォルトで Piesi で開く"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "让 zip、7z、rar、tar 等压缩包默认用 Piesi 打开"
           }
         },
         "zh-Hant": {
@@ -3249,6 +4159,12 @@
             "value": "デフォルトにする"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设为默认"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3269,6 +4185,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "デフォルトの展開ツールにする"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设为默认解压工具"
           }
         },
         "zh-Hant": {
@@ -3293,6 +4215,12 @@
             "value": "設定"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3313,6 +4241,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "設定…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置…"
           }
         },
         "zh-Hant": {
@@ -3337,6 +4271,12 @@
             "value": "Mac メタデータを読み取れずスキップ：%1$@：%2$@"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取 Mac 元数据失败，已跳过：%@：%@"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3357,6 +4297,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "スキップ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过"
           }
         },
         "zh-Hant": {
@@ -3381,6 +4327,12 @@
             "value": "%@ をスキップ：Finder 情報が 32 バイトではありません"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过 %@：Finder 信息不是 32 字节"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3401,6 +4353,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ をスキップ：拡張属性 %2$@ が AppleDouble に収まりません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过 %@：扩展属性 %@ 放不进 AppleDouble"
           }
         },
         "zh-Hant": {
@@ -3425,6 +4383,12 @@
             "value": "%1$@ をスキップ：拡張属性名 %2$@ が長すぎます"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过 %@：扩展属性名 %@ 太长"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3445,6 +4409,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ をスキップ：リソースフォークが上限の 64 MB を超えています"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过 %@：资源分支超过 64 MB 上限"
           }
         },
         "zh-Hant": {
@@ -3469,6 +4439,12 @@
             "value": "%llu 項目をスキップ"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过 %llu 项"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3489,6 +4465,12 @@
           "stringUnit": {
             "state": "translated",
             "value": ".DS_Store や __MACOSX などの不要ファイルをスキップ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过 .DS_Store、__MACOSX 等垃圾文件"
           }
         },
         "zh-Hant": {
@@ -3513,6 +4495,12 @@
             "value": "項目 %1$@ をスキップ：%2$@"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过条目 %@：%@"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3533,6 +4521,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "特殊ファイルをスキップ：%@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过特殊文件：%@"
           }
         },
         "zh-Hant": {
@@ -3557,6 +4551,12 @@
             "value": "展開先の外を指すシンボリックリンクをスキップ：%1$@ → %2$@"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过越出目标目录的符号链接：%@ → %@"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3577,6 +4577,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "このアーカイブは暗号化されています。続けるにはパスワードを入力してください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个压缩包已加密，输入密码后继续。"
           }
         },
         "zh-Hant": {
@@ -3601,6 +4607,12 @@
             "value": "ファイル名も暗号化（7z のみ）"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连文件名一起加密（仅 7z）"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3621,6 +4633,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Piesi を終了"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出 Piesi"
           }
         },
         "zh-Hant": {
@@ -3645,6 +4663,12 @@
             "value": "選択"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3665,6 +4689,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "選択…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择…"
           }
         },
         "zh-Hant": {
@@ -3689,6 +4719,12 @@
             "value": "圧縮するファイルまたはフォルダを選択"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择要压缩的文件或文件夹"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3709,6 +4745,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "表示するアーカイブを選択"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择要浏览的压缩包"
           }
         },
         "zh-Hant": {
@@ -3733,6 +4775,12 @@
             "value": "展開先を選択"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择解压位置"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3753,6 +4801,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "展開先を選択（%lld 項目）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择解压位置（%lld 项）"
           }
         },
         "zh-Hant": {
@@ -3777,6 +4831,12 @@
             "value": "一部の種類を設定できませんでした"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分类型没有设置成功"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3797,6 +4857,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "やり直す"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重做"
           }
         },
         "zh-Hant": {
@@ -3821,6 +4887,12 @@
             "value": "Piesi を非表示"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏 Piesi"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3841,6 +4913,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ほかを非表示"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏其他"
           }
         },
         "zh-Hant": {
@@ -3865,6 +4943,12 @@
             "value": "パスワードが必要です"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要密码"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3885,6 +4969,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "内容を表示するにはパスワードが必要です"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要密码才能列出内容"
           }
         },
         "zh-Hant": {
@@ -3909,6 +4999,12 @@
             "value": "プレビュー"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预览"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3929,6 +5025,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "詳細"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高级"
           }
         },
         "zh-Hant": {
@@ -3953,6 +5055,12 @@
             "value": "デフォルトの動作"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认动作"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3975,6 +5083,12 @@
             "value": "（暗号化）"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "（加密）"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
@@ -3995,6 +5109,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "（ASCII 以外のファイル名はありません）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "（没有非 ASCII 的文件名）"
           }
         },
         "zh-Hant": {
