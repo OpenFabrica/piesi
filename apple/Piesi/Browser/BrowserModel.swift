@@ -17,8 +17,12 @@ final class BrowserModel {
     private(set) var errorMessage: String?
     /// 用户输入过并验证通过的密码，预览 / 拖出 / 解压沿用
     private(set) var password: String?
-    /// 搜索框文字；非空时列表变成平铺结果
+    /// 搜索框文字（每敲一个字都变）
     var searchQuery = ""
+    /// 防抖后的搜索词（150 ms 没再敲才更新），非空时列表变成平铺结果
+    var debouncedQuery = ""
+    /// 搜索结果碰到上限，底栏提示「仅显示前 200 条」
+    var searchHitLimit = false
     /// 当前选中的行（outline 回写）
     var selectedRows: [Row] = []
     /// 每加一次，outline 就丢掉缓存重新拉根目录（切编码后）

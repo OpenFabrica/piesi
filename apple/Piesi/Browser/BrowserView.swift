@@ -22,6 +22,15 @@ struct BrowserView: View {
             bottomBar
         }
         .frame(minWidth: 640, minHeight: 400)
+        // 搜索防抖：每敲一个字就 search 一次太浪费，150 ms 没再敲才真正搜；清空则立刻生效
+        .task(id: model.searchQuery) {
+            let query = model.searchQuery
+            if !query.isEmpty {
+                try? await Task.sleep(for: .milliseconds(150))
+                if Task.isCancelled { return }
+            }
+            model.debouncedQuery = query
+        }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 extractMenu
@@ -51,7 +60,7 @@ struct BrowserView: View {
             ProgressView("正在打开…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ArchiveOutlineView(model: model, actions: actions.outline, reloadToken: model.reloadToken, searchQuery: model.searchQuery)
+            ArchiveOutlineView(model: model, actions: actions.outline, reloadToken: model.reloadToken, searchQuery: model.debouncedQuery)
         }
     }
 
@@ -99,6 +108,11 @@ struct BrowserView: View {
             Text(model.isLoaded ? model.bottomBarText : " ")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            if !model.debouncedQuery.isEmpty, model.searchHitLimit {
+                Text("仅显示前 \(ArchiveOutlineView.Coordinator.searchLimit) 条")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+            }
             Spacer()
             if !model.selectedRows.isEmpty {
                 Text("已选 \(model.selectedRows.count) 项")

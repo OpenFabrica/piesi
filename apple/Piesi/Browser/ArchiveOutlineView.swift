@@ -114,6 +114,12 @@ struct ArchiveOutlineView: NSViewRepresentable {
         private var lastToken = -1
         private var lastQuery = ""
         private var sortDescriptor: NSSortDescriptor?
+        /// 搜索平铺结果的上限，和底栏提示里的数字一致
+        static let searchLimit: UInt32 = 200
+        /// 已经排好但还没执行的重载（多次 sync 合并成一次）
+        private var reloadScheduled = false
+        /// 重载后要恢复展开的目录（切编码时记下）
+        private var pendingExpansion: [ExpandedKey] = []
         private var iconCache: [String: NSImage] = [:]
         /// 「类型」列文字按扩展名缓存：UTType(filenameExtension:) 不便宜，按类型排序时每次比较都会调
         private var kindTextCache: [String: String] = [:]
@@ -129,10 +135,13 @@ struct ArchiveOutlineView: NSViewRepresentable {
             self.actions = actions
         }
 
-        /// 编码或搜索词变了就丢缓存重载。
+        /// 编码或搜索词变了就丢缓存重载。重载推到下一轮主线程：updateNSView 跑在 SwiftUI 更新里，
+        /// reloadData 会同步触发 selectionDidChange 回写 model.selectedRows，等于在视图更新中改状态。
         func sync(token: Int, query: String) {
             var needsReload = false
             if token != lastToken {
+                // 切编码后节点对象全换，先记下展开过的目录，重载后按 id / 路径再展开
+                pendingExpansion = expandedKeys()
                 lastToken = token
                 roots = nil
                 searchResults = nil
@@ -144,7 +153,52 @@ struct ArchiveOutlineView: NSViewRepresentable {
                 needsReload = true
             }
             if needsReload {
+                scheduleReload()
+            }
+        }
+
+        /// 把重载排到当前主线程工作结束之后，多次 sync 合并成一次。
+        private func scheduleReload() {
+            guard !reloadScheduled else { return }
+            reloadScheduled = true
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                reloadScheduled = false
                 outlineView?.reloadData()
+                let keys = pendingExpansion
+                pendingExpansion = []
+                restoreExpansion(keys)
+            }
+        }
+
+        /// 展开状态的身份：真实目录用 id（切编码后 id 不变、名字会变），合成目录没有 id 只能按路径
+        private struct ExpandedKey {
+            let id: UInt32
+            let path: String
+
+            func matches(_ row: Row) -> Bool {
+                id == UInt32.max ? row.path == path : row.id == id
+            }
+        }
+
+        /// 当前展开的目录，按行序（父目录在前）。
+        private func expandedKeys() -> [ExpandedKey] {
+            guard let outlineView else { return [] }
+            return (0..<outlineView.numberOfRows).compactMap { index in
+                guard let node = outlineView.item(atRow: index) as? ArchiveNode, outlineView.isItemExpanded(node) else { return nil }
+                return ExpandedKey(id: node.row.id, path: node.row.path)
+            }
+        }
+
+        /// 按记下的顺序重新展开：父目录展开后子目录才会出现在行里，所以顺序不能乱。
+        private func restoreExpansion(_ keys: [ExpandedKey]) {
+            guard let outlineView, !keys.isEmpty, !isSearching else { return }
+            for key in keys {
+                for index in 0..<outlineView.numberOfRows {
+                    guard let node = outlineView.item(atRow: index) as? ArchiveNode, key.matches(node.row) else { continue }
+                    outlineView.expandItem(node)
+                    break
+                }
             }
         }
 
@@ -156,8 +210,14 @@ struct ArchiveOutlineView: NSViewRepresentable {
         private func rootNodes() -> [ArchiveNode] {
             if isSearching {
                 if searchResults == nil {
-                    let rows = model.handle?.search(query: lastQuery, limit: 200) ?? []
+                    let rows = model.handle?.search(query: lastQuery, limit: Self.searchLimit) ?? []
                     searchResults = sorted(rows.map(ArchiveNode.init))
+                    // 到了上限就让底栏提示还有没列出来的；这里可能在 AppKit 布局里被调，状态改动另起一轮
+                    let hitLimit = rows.count >= Int(Self.searchLimit)
+                    let model = self.model
+                    Task { @MainActor in
+                        if model.searchHitLimit != hitLimit { model.searchHitLimit = hitLimit }
+                    }
                 }
                 return searchResults ?? []
             }

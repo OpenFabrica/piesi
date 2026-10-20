@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         finishedLaunching = true
+        cleanStalePreviewDirectories()
         taskCenter.onChange = { [weak self] in
             guard let self else { return }
             tasksWindow.sync()
@@ -83,6 +84,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("piesi-preview-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
         try? FileManager.default.removeItem(at: dir)
+    }
+
+    /// 启动时清掉上次崩溃 / 被杀留下的 piesi-preview-<pid> 目录：只删进程已经不在的，后台做，不挡启动。
+    private func cleanStalePreviewDirectories() {
+        let temp = FileManager.default.temporaryDirectory
+        Task.detached(priority: .utility) {
+            let fm = FileManager.default
+            guard let names = try? fm.contentsOfDirectory(atPath: temp.path) else { return }
+            for name in names where name.hasPrefix("piesi-preview-") {
+                guard let pid = pid_t(name.dropFirst("piesi-preview-".count)) else { continue }
+                // kill(pid, 0) 不发信号只探测；ESRCH = 没有这个进程（EPERM 说明进程在但不是我们的，不能删）
+                guard kill(pid, 0) != 0, errno == ESRCH else { continue }
+                try? fm.removeItem(at: temp.appendingPathComponent(name, isDirectory: true))
+                Log.app.notice("removed stale preview dir \(name, privacy: .public)")
+            }
+        }
     }
 
     /// 自动退出由 maybeAutoQuit 决定，不用系统的「最后一个窗口关闭就退出」。
@@ -219,11 +236,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 /// Info.plist 里声明的压缩包类型（CFBundleDocumentTypes），打开面板和「设为默认」共用，只存一处。
 enum ArchiveTypes {
+    /// 所有 LSItemContentTypes 的 UTI 字符串（含自定义导入的 7z / rar / zst）
     static var identifiers: [String] {
         let types = Bundle.main.infoDictionary?["CFBundleDocumentTypes"] as? [[String: Any]] ?? []
         return types.flatMap { $0["LSItemContentTypes"] as? [String] ?? [] }
     }
 
+    /// 同上，转成 UTType（系统不认识的 UTI 会被丢掉）
     static var all: [UTType] {
         identifiers.compactMap { UTType($0) }
     }
