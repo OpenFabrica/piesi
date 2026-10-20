@@ -1066,11 +1066,10 @@ fn dos_time_to_unix(t: u32) -> Option<i64> {
 
 /// Rust 字符串转 NUL 结尾的 wchar_t 数组（macOS/Linux 4 字节，Windows 2 字节 UTF-16）。
 fn to_wide(s: &str) -> Vec<sys::WCHAR> {
-    let mut out: Vec<sys::WCHAR> = if std::mem::size_of::<sys::WCHAR>() == 2 {
-        s.encode_utf16().map(|u| u as sys::WCHAR).collect()
-    } else {
-        s.chars().map(|c| c as u32 as sys::WCHAR).collect()
-    };
+    #[cfg(windows)]
+    let mut out: Vec<sys::WCHAR> = s.encode_utf16().collect();
+    #[cfg(not(windows))]
+    let mut out: Vec<sys::WCHAR> = s.chars().map(|c| c as u32 as sys::WCHAR).collect();
     out.push(0);
     out
 }
@@ -1079,9 +1078,12 @@ fn to_wide(s: &str) -> Vec<sys::WCHAR> {
 fn wide_to_string(w: &[sys::WCHAR]) -> String {
     let end = w.iter().position(|&c| c == 0).unwrap_or(w.len());
     let w = &w[..end];
-    if std::mem::size_of::<sys::WCHAR>() == 2 {
-        char::decode_utf16(w.iter().map(|&c| c as u16)).map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER)).collect()
-    } else {
+    #[cfg(windows)]
+    {
+        String::from_utf16_lossy(&w[..end])
+    }
+    #[cfg(not(windows))]
+    {
         w.iter().map(|&c| char::from_u32(c as u32).unwrap_or(char::REPLACEMENT_CHARACTER)).collect()
     }
 }
