@@ -24,7 +24,7 @@ show_pathbar = False
 show_sidebar = False
 icon_size = 128
 text_size = 13
-hide_extensions = [app_name]
+# 不用 hide_extensions：它在 Piesi.app 上写 com.apple.FinderInfo，`codesign --verify --strict` 会判签名无效（v0.1.0 踩过）
 icon_locations = {
     app_name: (160, 180),
     "Applications": (480, 180),

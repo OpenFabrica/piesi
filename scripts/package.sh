@@ -85,6 +85,12 @@ fi
   -D app="$APP" -D icon="$APP/Contents/Resources/AppIcon.icns" -D background="$ROOT/scripts/dmg/background.tiff" \
   "Piesi" "$DMG"
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+# DMG 里的 app 再做一次严格签名校验：dmgbuild 之类的工具可能给 app 加扩展属性（FinderInfo 等），
+# 普通校验和 Gatekeeper 都放行，但 --strict 不过，Sparkle 装更新时也可能卡住
+DMG_MNT=$(mktemp -d)
+hdiutil attach -quiet -nobrowse -readonly -mountpoint "$DMG_MNT" "$DMG"
+codesign --verify --deep --strict "$DMG_MNT/Piesi.app" || { hdiutil detach -quiet "$DMG_MNT"; echo "DMG 里的 Piesi.app 严格签名校验没过" >&2; exit 1; }
+hdiutil detach -quiet "$DMG_MNT"
 
 if [ "${SKIP_NOTARIZE:-0}" != "1" ]; then
   if [ -n "${APPLE_NOTARY_KEY:-}" ]; then
