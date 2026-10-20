@@ -672,7 +672,7 @@ pub struct CreateRequest {
     pub skip_junk: bool,
     /// 「发给 Windows」：改成 Windows 安全名
     pub windows_safe: bool,
-    /// 「Mac 专用」：xattr / 资源分支 / Finder 信息写成 `__MACOSX/._名字` AppleDouble（只对 zip 生效）。
+    /// 「Mac 专用」：保留 xattr / 资源分支 / Finder 信息。zip 写 `__MACOSX/._名字`，tar.* 写同目录 `._名字` + PAX xattr，7z 忽略。
     /// 带默认值，生成的 Swift 构造器里是可选参数，老调用点不用改
     #[uniffi(default = false)]
     pub mac_metadata: bool,

@@ -1093,30 +1093,30 @@
         }
       }
     },
-    "保留 Mac 元数据（Finder 标签、资源分支，写进 __MACOSX）": {
+    "保留 Mac 元数据（Finder 标签、资源分支）": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Keep Mac metadata (Finder tags, resource forks; stored in __MACOSX)"
+            "value": "Keep Mac metadata (Finder tags, resource forks)"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac メタデータを保持（Finder タグ、リソースフォーク。__MACOSX に保存）"
+            "value": "Mac メタデータを保持（Finder タグ、リソースフォーク）"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "保留 Mac 元数据（Finder 标签、资源分支，写进 __MACOSX）"
+            "value": "保留 Mac 元数据（Finder 标签、资源分支）"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "保留 Mac 中繼資料（Finder 標籤、資源分支，寫進 __MACOSX）"
+            "value": "保留 Mac 中繼資料（Finder 標籤、資源分支）"
           }
         }
       }

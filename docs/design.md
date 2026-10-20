@@ -138,7 +138,7 @@
 写入：
 - 一律 UTF-8 + bit 11 + NFC 归一化；可选同时写 0x7075 给老工具。
 - 「发给 Windows」预设再做：替换 `\ / : * ? " < > |`、去尾部空格和点、提示保留名（CON、PRN、NUL…）、路径超过 240 字符提示。
-- 不写 `__MACOSX` 和 AppleDouble；「Mac 专用」预设才保留 xattr/资源分支（写成 `._` AppleDouble，与 ditto 兼容）。已实现（2026-10-19，`crates/piesi-core/src/create/apple_double.rs`）：产物与 `ditto -c -k --sequesterRsrc` 逐字节一致（`tests/mac_metadata.rs` 比对）；`._` 条目紧跟各自条目，`__MACOSX/…/` 目录条目只写一次；跳过 quarantine / decmpfs，单个 fork 上限 64 MB、条目表 64 KB；入口 CLI `piesi a --mac-metadata`、FFI `CreateRequest.mac_metadata`。只对 zip 生效，tar 的 PAX xattr 未做。
+- 不写 `__MACOSX` 和 AppleDouble；「Mac 专用」预设才保留 xattr/资源分支（写成 `._` AppleDouble，与 ditto 兼容）。已实现（2026-10-19，`crates/piesi-core/src/create/apple_double.rs`）：产物与 `ditto -c -k --sequesterRsrc` 逐字节一致（`tests/mac_metadata.rs` 比对）；`._` 条目紧跟各自条目，`__MACOSX/…/` 目录条目只写一次；跳过 quarantine / decmpfs，单个 fork 上限 64 MB、条目表 64 KB；入口 CLI `piesi a --mac-metadata`、FFI `CreateRequest.mac_metadata`。tar.* 也已实现（2026-10-20，`create/tar_writer.rs`）：照 macOS 自带 bsdtar 写两份——同目录 `._名字` AppleDouble 放在条目前面（系统 `tar -x`、归档工具默认靠它还原），加上条目自己的 PAX 头 `LIBARCHIVE.xattr.*`（base64）与 `SCHILY.xattr.*`（原字节），Finder 信息和资源分支也作为同名 xattr 写进去（`bsdtar --xattrs`、GNU tar `--xattrs` 靠它还原）；`tests/mac_metadata.rs` 用系统 tar 两种模式解包核对。7z 没有对应的存放方式，忽略该选项；App 里「保留 Mac 元数据」开关只在 7z 下禁用。
 
 ### 5.3 安全与文件系统规则
 - 所有输出走 `cap-std` 的 `Dir`：系统调用层拦截 `..`、绝对路径、穿越 symlink；symlink 最后创建；拒绝 Windows 盘符与 `\\?\`。

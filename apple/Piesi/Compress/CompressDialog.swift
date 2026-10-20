@@ -316,8 +316,9 @@ struct CompressDialogView: View {
             }
             GridRow {
                 Text("")
-                Toggle("保留 Mac 元数据（Finder 标签、资源分支，写进 __MACOSX）", isOn: $macMetadata)
-                    .disabled(format != .zip)
+                // zip 写成 __MACOSX/._，tar.* 写 ._ + PAX xattr；7z 没有对应的存放方式
+                Toggle("保留 Mac 元数据（Finder 标签、资源分支）", isOn: $macMetadata)
+                    .disabled(format == .sevenZ)
             }
         }
     }
@@ -371,8 +372,8 @@ struct CompressDialogView: View {
             encryptNames: encryptNames && format == .sevenZ && !password.isEmpty,
             skipJunk: skipJunk,
             windowsSafe: windowsSafe,
-            // 开关在非 zip 下是禁用的，但值可能还留着 true（先选 Mac 专用再改成 7z）；Rust 对 7z 会忽略，这里也不传
-            macMetadata: macMetadata && format == .zip
+            // 开关在 7z 下是禁用的，但值可能还留着 true（先选 Mac 专用再改成 7z）；Rust 对 7z 会忽略，这里也不传
+            macMetadata: macMetadata && format != .sevenZ
         )
         finish(options)
     }

@@ -1,5 +1,6 @@
-//! zip「Mac 专用」预设的集成测试：xattr / 资源分支 / Finder 信息写成 `__MACOSX/._名字` AppleDouble，
-//! 用系统的 ditto、unzip 交叉验证，再用 piesi 自己回读确认这些条目按垃圾处理。只在 macOS 上跑。
+//! 「Mac 专用」预设的集成测试：zip 把 xattr / 资源分支 / Finder 信息写成 `__MACOSX/._名字` AppleDouble，
+//! 用系统的 ditto、unzip 交叉验证；tar.* 写同目录 `._名字` + PAX xattr，用系统 bsdtar 和 Python tarfile 验证；
+//! 再用 piesi 自己回读确认这些条目按垃圾处理。只在 macOS 上跑。
 #![cfg(target_os = "macos")]
 
 use std::path::{Path, PathBuf};
@@ -228,5 +229,79 @@ fn oversize_fork_is_skipped_with_warning() {
     let ad = unzip_entry(&out, "__MACOSX/._huge.bin");
     assert_eq!(be32(&ad, 46), 0, "资源分支长度应为 0");
     assert!(String::from_utf8_lossy(&ad).contains(K_NAME));
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+/// tar.gz：`._` 紧挨在条目前面；系统 tar 默认（靠 `._`）和 `--xattrs`（靠 PAX）都能把元数据还原；
+/// PAX 头里的值逐字节对；quarantine 不进包；piesi 回读时 `._` 是垃圾。
+#[test]
+fn tar_restores_via_apple_double_and_pax() {
+    let work = workdir("tar");
+    let src = work.join("src");
+    make_sources(&src, true);
+    let tar = work.join("mac.tar.gz");
+    let opts = CreateOptions { format: CreateFormat::TarGz, level: 5, mac_metadata: true, ..Default::default() };
+    let roots = ["f.txt", "dir", "emptydir", "link"].map(|n| src.join(n));
+    let report = create_archive(&tar, &roots, &opts, &OpContext::silent()).unwrap();
+    assert!(report.warnings.is_empty(), "不该有 warning：{:?}", report.warnings);
+
+    let names = entry_names(&tar);
+    let pos = |n: &str| names.iter().position(|x| x == n).unwrap_or_else(|| panic!("缺少条目 {n}：{names:?}"));
+    assert_eq!(pos("._f.txt") + 1, pos("f.txt"), "{names:?}");
+    assert_eq!(pos("dir/._n.txt") + 1, pos("dir/n.txt"), "{names:?}");
+    assert_eq!(pos("._dir") + 1, pos("dir"), "{names:?}");
+    assert!(!names.iter().any(|n| n == "._link"), "符号链接不处理：{names:?}");
+    assert!(names.iter().filter(|n| n.contains("._")).all(|n| names::is_junk_path(n)));
+
+    // PAX 头：Python tarfile 把 SCHILY 值按 surrogateescape 解成 str，还原成字节再比
+    let script = r#"
+import sys, tarfile
+for m in tarfile.open(sys.argv[1]).getmembers():
+    for k, v in sorted(m.pax_headers.items()):
+        if 'xattr' in k:
+            print(m.name, k, v.encode('utf-8', 'surrogateescape').hex())
+"#;
+    let pax = run("python3", &["-I", "-c", script, tar.to_str().unwrap()], &work);
+    let hex = |b: &[u8]| b.iter().map(|x| format!("{x:02x}")).collect::<String>();
+    for (name, key, value) in [
+        ("f.txt", K_NAME, &b"v"[..]),
+        ("f.txt", TAGS_NAME, TAGS_PLIST),
+        ("f.txt", RSRC, RSRC_DATA),
+        ("f.txt", FINDER_INFO, &file_finder_info()[..]),
+        ("dir", FINDER_INFO, &dir_finder_info()[..]),
+        ("dir/n.txt", "com.example.n", &b"nv"[..]),
+    ] {
+        let line = format!("{name} SCHILY.xattr.{key} {}", hex(value));
+        assert!(pax.lines().any(|l| l == line), "缺少 PAX 记录 {line}：\n{pax}");
+        assert!(pax.lines().any(|l| l.starts_with(&format!("{name} LIBARCHIVE.xattr.{key} "))), "缺少 LIBARCHIVE 记录 {name} {key}");
+    }
+    assert!(!pax.contains(QUARANTINE), "quarantine 不该进包：\n{pax}");
+
+    // 系统 tar：默认模式和 --xattrs 模式各解一次，元数据都要回来，`._` 不落地
+    for (tag, extra) in [("default", None), ("xattrs", Some("--xattrs"))] {
+        let dest = work.join(format!("tar-out-{tag}"));
+        std::fs::create_dir_all(&dest).unwrap();
+        let mut args: Vec<&str> = extra.into_iter().collect();
+        args.extend(["-xf", tar.to_str().unwrap(), "-C", dest.to_str().unwrap()]);
+        run("/usr/bin/tar", &args, &work);
+        let f = dest.join("f.txt");
+        assert_eq!(std::fs::read(&f).unwrap(), b"hello\n");
+        assert_eq!(xattr::get(&f, K_NAME).unwrap().as_deref(), Some(&b"v"[..]), "{tag}：xattr 没回来");
+        assert_eq!(xattr::get(&f, TAGS_NAME).unwrap().as_deref(), Some(TAGS_PLIST), "{tag}：Finder 标签没回来");
+        assert_eq!(std::fs::read(dest.join("f.txt/..namedfork/rsrc")).unwrap(), RSRC_DATA, "{tag}：资源分支没回来");
+        assert_eq!(xattr::get(&f, FINDER_INFO).unwrap().as_deref(), Some(&file_finder_info()[..]), "{tag}：Finder 信息没回来");
+        assert_eq!(xattr::get(&f, QUARANTINE).unwrap(), None, "{tag}：quarantine 不该被带过来");
+        assert_eq!(xattr::get(dest.join("dir"), FINDER_INFO).unwrap().as_deref(), Some(&dir_finder_info()[..]), "{tag}：目录的 Finder 信息没回来");
+        assert_eq!(xattr::get(dest.join("dir/n.txt"), "com.example.n").unwrap().as_deref(), Some(&b"nv"[..]), "{tag}");
+        assert_eq!(std::fs::read_link(dest.join("link")).unwrap(), Path::new("f.txt"));
+        assert!(!dest.join("._f.txt").exists(), "{tag}：`._` 应被系统 tar 吃掉");
+    }
+
+    // 不开选项：没有 `._`，也没有 PAX xattr
+    let plain = work.join("plain.tar.gz");
+    let opts = CreateOptions { mac_metadata: false, ..opts };
+    create_archive(&plain, &roots, &opts, &OpContext::silent()).unwrap();
+    assert!(!entry_names(&plain).iter().any(|n| n.contains("._")));
+    assert!(run("python3", &["-I", "-c", script, plain.to_str().unwrap()], &work).is_empty());
     std::fs::remove_dir_all(&work).unwrap();
 }

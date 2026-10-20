@@ -20,6 +20,7 @@ piesi x 包.7z -o 目标目录 -p 密码    # 指定目录与密码；--id 3 --i
 piesi t 包.zip                      # 校验（解码 + CRC，不写盘），损坏或密码错误时退出码非 0
 piesi a 输出.zip 目录 文件…          # 创建 zip（UTF-8 + bit 11 + NFC，多线程）
 piesi a 输出.zip --mac-metadata 目录  # 「Mac 专用」zip：标签、资源分支、Finder 信息写成 __MACOSX/._ 条目，ditto / 归档工具可还原
+piesi a 输出.tar.gz --mac-metadata 目录  # tar 同理：写 ._ 条目 + PAX xattr，系统 tar（含 --xattrs）、GNU tar --xattrs 可还原
 piesi a 输出.zip -p 密码 目录         # AES-256 加密 zip（WinZip AE-1/AE-2 格式，7-Zip / WinZip / Keka 可解）；7z 同样用 -p，--encrypt-names 连文件名一起加密
 piesi a 输出.7z --level 7 目录      # 创建 7z（多线程 LZMA2，solid 块 128 MB）
 piesi a 输出.tar.zst 目录           # tar.gz / tar.xz / tar.zst

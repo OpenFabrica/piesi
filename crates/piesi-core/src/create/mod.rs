@@ -46,8 +46,8 @@ pub struct CreateOptions {
     pub skip_junk: bool,
     /// 把文件名改成 Windows 安全名（「发给 Windows」预设）
     pub windows_safe: bool,
-    /// 「Mac 专用」预设：把 Finder 信息、扩展属性、资源分支写成 `__MACOSX/._名字` AppleDouble 条目
-    /// （与 ditto / 归档工具兼容）。只对 zip 生效，其它格式暂时忽略
+    /// 「Mac 专用」预设：保留 Finder 信息、扩展属性、资源分支。zip 写成 `__MACOSX/._名字` AppleDouble 条目
+    /// （与 ditto / 归档工具兼容）；tar.* 写同目录 `._名字` + PAX xattr（与 macOS bsdtar 兼容）；7z 忽略
     pub mac_metadata: bool,
     /// 线程数，0 = CPU 核数
     pub threads: usize,
@@ -194,7 +194,7 @@ pub fn create_archive(dest: &Path, roots: &[PathBuf], opts: &CreateOptions, ctx:
     match opts.format {
         CreateFormat::Zip => report.warnings.extend(crate::create::zip_writer::write_zip(dest, &sources, opts, ctx)?),
         CreateFormat::SevenZ => crate::create::sevenz_writer::write_7z(dest, &sources, opts, ctx)?,
-        CreateFormat::TarGz | CreateFormat::TarXz | CreateFormat::TarZst => crate::create::tar_writer::write_tar(dest, &sources, opts, ctx)?,
+        CreateFormat::TarGz | CreateFormat::TarXz | CreateFormat::TarZst => report.warnings.extend(crate::create::tar_writer::write_tar(dest, &sources, opts, ctx)?),
     }
     report.output_bytes = std::fs::metadata(dest)?.len();
     Ok(report)

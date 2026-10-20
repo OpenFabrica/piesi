@@ -135,7 +135,7 @@ enum Cmd {
         /// 文件名改成 Windows 安全名
         #[arg(long)]
         windows_safe: bool,
-        /// 「Mac 专用」：xattr / 资源分支 / Finder 信息写成 __MACOSX/._ AppleDouble 条目（只对 zip 生效）
+        /// 「Mac 专用」：保留 xattr / 资源分支 / Finder 信息（zip 写 __MACOSX/._；tar.* 写 ._ + PAX xattr；7z 忽略）
         #[arg(long)]
         mac_metadata: bool,
         /// 线程数（默认 CPU 核数）
