@@ -2,6 +2,10 @@
 
 未发布的改动不写在这里；发版时按 `docs/release.md` 在顶部加一节。
 
+## 0.1.2 · 2026-10-26 · beta
+
+- 修正从微信等 app 里双击压缩包时报「Operation not permitted」：压缩包所在文件夹不能写入时（别的 app 的私有文件夹、只读磁盘），改为解压到「下载」，并在 Finder 里选中结果
+
 ## 0.1.1 · 2026-10-20 · beta（Windows / Linux CLI）
 
 - 新增 Windows x64 命令行安装程序与便携 ZIP；支持当前用户安装、添加 PATH 与卸载清理
