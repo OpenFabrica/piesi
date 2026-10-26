@@ -26,9 +26,29 @@ final class ExtractCoordinator {
     }
 
     /// 整包解压到压缩包旁边（双击路径）。成功返回解出来的根目录，失败 / 取消返回 nil。
+    /// 旁边写不进去（别的 app 的容器目录、只读卷）时改解到「下载」，并强制在 Finder 里选中结果，免得用户找不到。
     @discardableResult
     func extractAll(archive url: URL, parent: NSWindow?) async -> URL? {
-        await run(archive: url, ids: [], dest: "", presets: ExtractPresets(), parent: parent)
+        let folder = url.deletingLastPathComponent()
+        guard !Self.canWrite(in: folder),
+              let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        else {
+            return await run(archive: url, ids: [], dest: "", presets: ExtractPresets(), parent: parent)
+        }
+        Log.extract.notice("not writable \(folder.path, privacy: .public), fallback → \(downloads.path, privacy: .public)")
+        return await run(archive: url, ids: [], dest: downloads.path, presets: ExtractPresets(), parent: parent, forceReveal: true)
+    }
+
+    /// 真建一个临时文件来试目录能不能写。
+    /// 为什么不用 FileManager.isWritableFile：它走 access(2)，看不到 macOS 的「App 数据保护」（微信等 app 的
+    /// ~/Library/Containers/…），也看不到沙盒 / TCC 拦截，会说「能写」，真写时才 EPERM。
+    private static func canWrite(in folder: URL) -> Bool {
+        let probe = folder.appendingPathComponent(".piesi-probe-\(UUID().uuidString)")
+        let fd = open(probe.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
+        guard fd >= 0 else { return false }
+        close(fd)
+        unlink(probe.path)
+        return true
     }
 
     /// 浏览窗口触发：指定目标目录和条目（空 = 全部），沿用窗口已定的编码 / 密码。
@@ -39,8 +59,8 @@ final class ExtractCoordinator {
 
     // MARK: 流程
 
-    /// 成功返回实际落盘的根目录。
-    private func run(archive url: URL, ids: [UInt32], dest: String, presets: ExtractPresets, parent: NSWindow?) async -> URL? {
+    /// 成功返回实际落盘的根目录。forceReveal：不管设置，都在 Finder 里选中结果（目标不是压缩包旁边时用）。
+    private func run(archive url: URL, ids: [UInt32], dest: String, presets: ExtractPresets, parent: NSWindow?, forceReveal: Bool = false) async -> URL? {
         let name = url.lastPathComponent
 
         // 1. 打开
@@ -137,7 +157,7 @@ final class ExtractCoordinator {
                 for warning in result.warnings {
                     Log.extract.warning("extract \(name, privacy: .public): \(warning.localizedText, privacy: .public)")
                 }
-                finish(result: result, archive: url, wholeArchive: ids.isEmpty)
+                finish(result: result, archive: url, wholeArchive: ids.isEmpty, forceReveal: forceReveal)
                 return URL(fileURLWithPath: result.root)
             } catch {
                 if CoreBridge.isCancelled(error) {
@@ -188,9 +208,9 @@ final class ExtractCoordinator {
         }
     }
 
-    /// 收尾：按设置在 Finder 里选中解出来的顶层项目（没有就退回根目录）、把压缩包移到废纸篓（只在整包解压时）。
-    private func finish(result: ExtractResult, archive: URL, wholeArchive: Bool) {
-        if settings.revealInFinder {
+    /// 收尾：按设置（或 forceReveal）在 Finder 里选中解出来的顶层项目（没有就退回根目录）、把压缩包移到废纸篓（只在整包解压时）。
+    private func finish(result: ExtractResult, archive: URL, wholeArchive: Bool, forceReveal: Bool) {
+        if settings.revealInFinder || forceReveal {
             let paths = result.topLevel.isEmpty ? [result.root] : result.topLevel
             NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) })
         }
