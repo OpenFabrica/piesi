@@ -8,14 +8,18 @@ struct CompressionMenuTests {
     static func main() throws {
         for singleFile in [false, true] {
             let menu = FinderSync.compressionMenu(singleFile: singleFile)
-            let formats = menu.items.compactMap { ($0.representedObject as? String).flatMap(CompressionFormat.init(rawValue:)) }
+            let formats = menu.items.compactMap { FinderSync.compressionFormat(menuTag: $0.tag) }
             let expected = CompressionFormat.allCases.filter { !$0.isSingleFile || singleFile }
             precondition(formats == expected)
+            precondition(menu.items.dropLast(2).allSatisfy { $0.representedObject == nil })
             precondition(formats.count == (singleFile ? 11 : 7))
             precondition(menu.items.dropLast(2).allSatisfy { $0.action == #selector(FinderSync.compressFormat(_:)) })
             precondition(menu.items[menu.items.count - 2].isSeparatorItem)
             precondition(menu.items.last?.action == #selector(FinderSync.compress(_:)))
         }
+        precondition(FinderSync.compressionFormat(menuTag: 0) == nil)
+        precondition(FinderSync.compressionFormat(menuTag: -1) == nil)
+        precondition(FinderSync.compressionFormat(menuTag: 1000) == nil)
         let old = Data(#"{"action":"compress","paths":["/tmp/中文.txt"]}"#.utf8)
         let decoded = try JSONDecoder().decode(FinderRequest.self, from: old)
         precondition(decoded.format == nil)

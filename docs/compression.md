@@ -27,7 +27,7 @@ flowchart TD
 
 创建格式共 11 种，RAR 继续只读。CLI 优先采用 `--format`，否则按输出扩展名推断；支持 tgz / tbz / tbz2 / txz / tzst 别名。裸压缩流不能打包多个文件、目录或符号链接，界面按输入隐藏这些格式，引擎也校验。非 ZIP / 7z 格式传入密码会明确拒绝。切换到不支持密码的格式会清空对话框中的密码，避免忽略密码后误以为输出已加密。
 
-Finder 使用不依赖引擎的 `CompressionFormat` 传递格式，主应用转换为 UniFFI 的 `CreateFormat`；旧请求没有格式字段时继续打开自定义对话框。普通创建默认保留原文件名；Windows 安全名转换仅通过高级选项或预设启用。同名输出自动加序号，源文件保留。
+Finder 的格式子菜单以 `NSMenuItem.tag` 携带格式索引；Finder 跨进程回传不保留 `representedObject`，不能用它接收选择。扩展使用不依赖引擎的 `CompressionFormat` 传递格式，主应用转换为 UniFFI 的 `CreateFormat`；旧请求没有格式字段时继续打开自定义对话框。普通创建默认保留原文件名；Windows 安全名转换仅通过高级选项或预设启用。同名输出自动加序号，源文件保留。
 
 ## 主机资源与吞吐
 

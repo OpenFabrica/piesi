@@ -68,14 +68,22 @@ final class FinderSync: FIFinderSync {
     @MainActor
     static func compressionMenu(singleFile: Bool) -> NSMenu {
         let menu = NSMenu(title: "")
-        for format in CompressionFormat.allCases where !format.isSingleFile || singleFile {
+        for (index, format) in CompressionFormat.allCases.enumerated() where !format.isSingleFile || singleFile {
             let entry = NSMenuItem(title: format.title, action: #selector(compressFormat(_:)), keyEquivalent: "")
-            entry.representedObject = format.rawValue
+            // Finder 跨进程转发菜单只保留 tag，不传 representedObject。0 留给无格式的菜单项。
+            entry.tag = index + 1
             menu.addItem(entry)
         }
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: String(localized: "自定义压缩…"), action: #selector(compress(_:)), keyEquivalent: ""))
         return menu
+    }
+
+    /// 从 Finder 回传的菜单 tag 恢复格式；无格式菜单项返回 nil。
+    static func compressionFormat(menuTag: Int) -> CompressionFormat? {
+        let formats = CompressionFormat.allCases
+        guard menuTag > 0, menuTag <= formats.count else { return nil }
+        return formats[menuTag - 1]
     }
 
     /// 在主线程上建菜单。为什么：Finder 从后台队列调 menu(for:)（实测），而 NSMenu 只能在主线程用；
@@ -106,7 +114,10 @@ final class FinderSync: FIFinderSync {
 
     /// 格式菜单直接创建，省去确认对话框。
     @objc func compressFormat(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let format = CompressionFormat(rawValue: raw) else { return }
+        guard let format = Self.compressionFormat(menuTag: sender.tag) else {
+            log.error("unknown compression menu tag: \(sender.tag)")
+            return
+        }
         send(.compress, format: format)
     }
 
