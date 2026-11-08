@@ -26,14 +26,17 @@ piesi a 输出.zip --mac-metadata 目录  # 「Mac 专用」zip：标签、资�
 piesi a 输出.tar.gz --mac-metadata 目录  # tar 同理：写 ._ 条目 + PAX xattr，系统 tar（含 --xattrs）、GNU tar --xattrs 可还原
 piesi a 输出.zip -p 密码 目录         # AES-256 加密 zip（WinZip AE-1/AE-2 格式，7-Zip / WinZip / Keka 可解）；7z 同样用 -p，--encrypt-names 连文件名一起加密
 piesi a 输出.7z --level 7 目录      # 创建 7z（多线程 LZMA2，solid 块 128 MB）
-piesi a 输出.tar.zst 目录           # tar.gz / tar.xz / tar.zst
+piesi a 输出.tar.zst 目录           # tar / tar.gz / tar.bz2 / tar.xz / tar.zst
+piesi a 文件.txt.gz 文件.txt        # 单文件 gz / bz2 / xz / zst
 ```
 
-macOS app（`apple/`）：双击压缩包直接解压到旁边（⌥ 双击或 Finder 右键「用 Piesi 查看」进浏览窗口）、浏览窗口（搜索、Quick Look、拖出、校验、编码切换）、压缩对话框（发给 Windows / 最小体积 / 加密 / Mac 专用四个预设）、设置、Finder 右键菜单（顶层命令，需在系统设置里打开 Piesi 扩展；另有「服务」菜单）、设为默认解压工具、快捷指令（App Intents：「用 Piesi 解压」「用 Piesi 压缩」）。界面有简体中文、繁体中文、English、日本語，其它语言回落到英文。
+macOS app（`apple/`）：双击压缩包直接解压到旁边（⌥ 双击或 Finder 右键「用 Piesi 查看」进浏览窗口）、浏览窗口（搜索、Quick Look、拖出、校验、编码切换）、压缩对话框（直接选择格式，特殊用途预设收进高级选项）、设置、Finder 右键菜单（选格式直接压缩，另可自定义；需在系统设置里打开 Piesi 扩展；另有「服务」菜单）、设为默认解压工具、快捷指令（App Intents：「用 Piesi 解压」「用 Piesi 压缩」）。界面有简体中文、繁体中文、English、日本語，其它语言回落到英文。
 Quick Look 扩展：在 Finder 里按空格预览 zip / 7z / rar / tar 的条目树（只读索引，不解压）。
 
 支持读取：zip（zip64、AES、ZipCrypto、`.zip.001`、`.z01` 分卷）、7z（BCJ/BCJ2/ARM64、solid、头加密、`.7z.001`）、rar（v4/v5、分卷、加密）、tar 及 tar.gz/bz2/xz/zst、单文件 gz/bz2/xz/zst。
-支持创建：zip（可 AES-256 加密）、7z（可 AES-256 加密、加密文件名）、tar.gz、tar.xz、tar.zst。macOS app 与 Quick Look 扩展在 `apple/`。
+支持创建：zip（可 AES-256 加密）、7z（可 AES-256 加密、加密文件名）、tar、tar.gz、tar.bz2、tar.xz、tar.zst，以及单文件 gz、bz2、xz、zst。macOS app 与 Quick Look 扩展在 `apple/`。
+
+压缩调度、格式限制和验证方式见 [压缩领域说明](docs/compression.md)。
 
 ## 开发
 

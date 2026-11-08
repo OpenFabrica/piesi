@@ -61,6 +61,8 @@ extension ErrorDetail {
         case .sevenZLibrary: String(localized: "7z：\(a)")
         case .tarDriverMismatch: String(localized: "tar 驱动不处理 \(a)")
         case .tarEntryReadFailed: String(localized: "tar 第 \(a) 个条目读取失败：\(b)")
+        case .createPasswordUnsupported: String(localized: "该格式不支持密码加密，请选择 ZIP 或 7z")
+        case .createSingleFileRequired: String(localized: "该格式只接受一个普通文件；多个文件或文件夹请选择 TAR 系列、ZIP 或 7z")
         case .notTarFormat: String(localized: "\(a) 不是 tar 格式")
         case .zipTooShort: String(localized: "文件太短，不是 zip")
         case .zipTailReadFailed: String(localized: "读取文件尾部失败")

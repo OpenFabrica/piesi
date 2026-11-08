@@ -1,8 +1,32 @@
-// CompressDialog.swift —— 压缩对话框（设计 6.2）：四张预设卡片 + 文件名 / 位置 + 「高级」里的格式、级别、密码、垃圾过滤、Windows 安全名。
+// CompressDialog.swift —— 格式、文件名与位置优先；预设、密码及兼容选项收进可展开的高级区域。
 import AppKit
 import SwiftUI
 
-/// 预设卡片。选中即套一组默认值，之后还能在「高级」里改。
+/// 将不依赖引擎的格式标识转换为 UniFFI 格式。
+extension CompressionFormat {
+    var coreFormat: CreateFormat {
+        switch self {
+        case .zip: .zip
+        case .sevenZ: .sevenZ
+        case .tar: .tar
+        case .tarGz: .tarGz
+        case .tarBz2: .tarBz2
+        case .tarXz: .tarXz
+        case .tarZst: .tarZst
+        case .gz: .gz
+        case .bz2: .bz2
+        case .xz: .xz
+        case .zst: .zst
+        }
+    }
+}
+
+/// 创建能力与 Rust CreateFormat 保持一致，避免提交不支持的选项。
+extension CreateFormat {
+    var isSingleFile: Bool { [.gz, .bz2, .xz, .zst].contains(self) }
+}
+
+/// 可选的特殊用途预设，保留快捷指令兼容。
 enum CompressPreset: String, CaseIterable, Identifiable, Sendable {
     case windows
     case smallest
@@ -17,24 +41,6 @@ enum CompressPreset: String, CaseIterable, Identifiable, Sendable {
         case .smallest: String(localized: "最小体积")
         case .encrypted: String(localized: "加密")
         case .mac: String(localized: "Mac 专用")
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .windows: String(localized: "ZIP · Windows 安全文件名")
-        case .smallest: String(localized: "7z · 级别 7")
-        case .encrypted: String(localized: "7z · 密码 + 文件名加密")
-        case .mac: String(localized: "ZIP · 保留 Finder 标签等 Mac 元数据")
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .windows: "pc"
-        case .smallest: "arrow.down.right.and.arrow.up.left"
-        case .encrypted: "lock.fill"
-        case .mac: "desktopcomputer"
         }
     }
 
@@ -62,7 +68,7 @@ enum CompressPreset: String, CaseIterable, Identifiable, Sendable {
         self == .mac
     }
 
-    /// 这张卡片在「高级」里什么都不改直接点「压缩」会得到的参数（skipJunk 默认开）；-PiesiCompress 入口和 App Intents 用。
+    /// 该预设保留默认高级选项时的参数（skipJunk 默认开）；-PiesiCompress 入口和 App Intents 共用。
     /// 文件名加密和 submit() 一样只在 7z + 有密码时为真。
     func options(destination: URL, sources: [URL], password: String?) -> CompressOptions {
         CompressOptions(
@@ -101,7 +107,7 @@ struct CompressDialogView: View {
     @State private var passwordConfirm = ""
     @State private var encryptNames = false
     @State private var skipJunk = true
-    @State private var windowsSafe = true
+    @State private var windowsSafe = false
     @State private var macMetadata = false
     @State private var baseName: String
     @State private var directory: URL
@@ -115,14 +121,13 @@ struct CompressDialogView: View {
         _baseName = State(initialValue: ArchiveNaming.defaultBaseName(for: sources))
     }
 
-    /// 当前高亮的预设：按格式 / 级别 / 安全名 / 文件名加密 / Mac 元数据反推，哪张卡片的值全对上就是哪张。
-    /// 不用 @State 存：之前 apply() 先改值再设 preset，各个 onChange 在下一轮视图更新才跑，最后把 preset 清成了 nil。
-    private var preset: CompressPreset? {
-        CompressPreset.allCases.first {
-            $0.format == format && Int($0.level) == Int(level) && $0.windowsSafe == windowsSafe
-                && $0.encryptNames == encryptNames && $0.macMetadata == macMetadata
-        }
+    /// 单文件压缩流不能打包目录或多个文件。
+    private var isSingleFile: Bool {
+        sources.count == 1 && (try? sources[0].resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])).map { $0.isRegularFile == true && $0.isSymbolicLink != true } == true
     }
+
+    private var supportsPassword: Bool { format == .zip || format == .sevenZ }
+    private var supportsMetadata: Bool { format != .sevenZ && !format.isSingleFile }
 
     /// 完整文件名：基础名 + 当前格式的扩展名
     private var fileName: String {
@@ -141,8 +146,10 @@ struct CompressDialogView: View {
 
     /// 能否按「压缩」：名字非空、密码一致；要加密文件名就必须有密码，否则会得到没加密的 7z。
     private var canSubmit: Bool {
-        guard !baseName.trimmingCharacters(in: .whitespaces).isEmpty, !passwordMismatch else { return false }
-        if encryptNames, password.isEmpty { return false }
+        guard !baseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !baseName.contains("/"), baseName != ".", baseName != "..",
+              !supportsPassword || !passwordMismatch else { return false }
+        if format == .sevenZ, encryptNames, password.isEmpty { return false }
         return true
     }
 
@@ -160,11 +167,40 @@ struct CompressDialogView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
-            presetCards
+            HStack {
+                Text("格式")
+                    .frame(width: 52, alignment: .trailing)
+                Picker("格式", selection: $format) {
+                    ForEach(CompressionFormat.allCases.filter { !$0.isSingleFile || isSingleFile }, id: \.self) { candidate in
+                        Text(candidate.title).tag(candidate.coreFormat)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 170)
+                Spacer()
+            }
             nameAndLocation
-            DisclosureGroup("高级", isExpanded: $showAdvanced) {
-                advanced
-                    .padding(.top, 6)
+            Button {
+                showAdvanced.toggle()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: showAdvanced ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold))
+                    Text("高级")
+                    Spacer()
+                }
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(showAdvanced ? String(localized: "已展开") : String(localized: "已折叠"))
+            if showAdvanced {
+                ScrollView {
+                    advanced
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(height: 260)
             }
             HStack {
                 Spacer()
@@ -180,45 +216,16 @@ struct CompressDialogView: View {
             }
         }
         .padding(20)
-        .frame(width: 580)
+        .frame(width: 520)
+        .fixedSize(horizontal: false, vertical: true)
         .onChange(of: format) { _, _ in
             // 非 7z 没有文件名加密
-            if format != .sevenZ {
-                encryptNames = false
+            if format != .sevenZ { encryptNames = false }
+            if !supportsPassword {
+                password = ""
+                passwordConfirm = ""
             }
-        }
-    }
-
-    /// 四张预设卡片。
-    private var presetCards: some View {
-        HStack(spacing: 10) {
-            ForEach(CompressPreset.allCases) { candidate in
-                Button {
-                    apply(candidate)
-                } label: {
-                    VStack(spacing: 6) {
-                        Image(systemName: candidate.icon)
-                            .font(.title2)
-                        Text(candidate.title)
-                            .font(.callout.weight(.medium))
-                        Text(candidate.subtitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 84)
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(preset == candidate ? Color.accentColor.opacity(0.15) : Color(nsColor: .controlBackgroundColor))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(preset == candidate ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: preset == candidate ? 2 : 1)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
+            if !supportsMetadata { macMetadata = false }
         }
     }
 
@@ -259,21 +266,18 @@ struct CompressDialogView: View {
     private var advanced: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
             GridRow {
-                Text("格式")
+                Text("预设")
                     .gridColumnAlignment(.trailing)
-                Picker("", selection: $format) {
-                    Text("ZIP").tag(CreateFormat.zip)
-                    Text("7z").tag(CreateFormat.sevenZ)
-                    Text("tar.gz").tag(CreateFormat.tarGz)
-                    Text("tar.xz").tag(CreateFormat.tarXz)
-                    Text("tar.zst").tag(CreateFormat.tarZst)
+                Menu("选择预设…") {
+                    ForEach(CompressPreset.allCases) { candidate in
+                        Button(candidate.title) { apply(candidate) }
+                    }
                 }
-                .labelsHidden()
-                .frame(width: 140)
+                .frame(width: 170)
             }
             GridRow {
                 Text("级别")
-                Slider(value: $level, in: 1...9, step: 1) {
+                Slider(value: $level, in: 0...9, step: 1) {
                     EmptyView()
                 } minimumValueLabel: {
                     Text("快")
@@ -281,6 +285,7 @@ struct CompressDialogView: View {
                     Text("小")
                 }
                 .frame(width: 220)
+                .disabled(format == .tar)
                 Text("\(Int(level))")
                     .monospacedDigit()
             }
@@ -289,13 +294,15 @@ struct CompressDialogView: View {
                 SecureField("不加密", text: $password)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
+                    .disabled(!supportsPassword)
             }
             GridRow {
                 Text("确认密码")
                 SecureField("再输一次", text: $passwordConfirm)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
-                if passwordMismatch {
+                    .disabled(!supportsPassword)
+                if supportsPassword && passwordMismatch {
                     Text("两次输入不一致")
                         .font(.caption)
                         .foregroundStyle(.red)
@@ -318,7 +325,7 @@ struct CompressDialogView: View {
                 Text("")
                 // zip 写成 __MACOSX/._，tar.* 写 ._ + PAX xattr；7z 没有对应的存放方式
                 Toggle("保留 Mac 元数据（Finder 标签、资源分支）", isOn: $macMetadata)
-                    .disabled(format == .sevenZ)
+                    .disabled(!supportsMetadata)
             }
         }
     }
@@ -368,12 +375,12 @@ struct CompressDialogView: View {
             sources: sources,
             format: format,
             level: UInt8(level),
-            password: password.isEmpty ? nil : password,
+            password: supportsPassword && !password.isEmpty ? password : nil,
             encryptNames: encryptNames && format == .sevenZ && !password.isEmpty,
             skipJunk: skipJunk,
             windowsSafe: windowsSafe,
             // 开关在 7z 下是禁用的，但值可能还留着 true（先选 Mac 专用再改成 7z）；Rust 对 7z 会忽略，这里也不传
-            macMetadata: macMetadata && format != .sevenZ
+            macMetadata: macMetadata && supportsMetadata
         )
         finish(options)
     }

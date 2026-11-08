@@ -191,3 +191,72 @@ fn unsafe_path_reason_is_structured() {
     assert_eq!(piesi_ffi::unsafe_path_reason("/abs".into()).map(|d| d.kind), Some(piesi_ffi::DetailKind::PathAbsolute));
     assert!(piesi_ffi::unsafe_path_reason("a/b.txt".into()).is_none());
 }
+
+/// 最后一个输入块读取完成时取消，流水线仍须返回 Cancelled 并删除未完成输出。
+#[test]
+fn zip_late_cancel_removes_output() {
+    struct CancelWhenRead(Arc<CancelHandle>);
+    impl ProgressListener for CancelWhenRead {
+        fn on_progress(&self, info: ProgressInfo) {
+            if info.done_bytes >= 12 * 1024 * 1024 { self.0.cancel(); }
+        }
+    }
+    let dir = scratch("zip-late-cancel");
+    let src = dir.join("large.bin");
+    fs::write(&src, vec![42; 12 * 1024 * 1024]).unwrap();
+    let out = dir.join("cancelled.zip");
+    for existing in [false, true] {
+        if existing { fs::write(&out, b"original archive").unwrap(); }
+        let cancel = CancelHandle::new();
+        let req = CreateRequest {
+            dest: out.to_string_lossy().into_owned(), sources: vec![src.to_string_lossy().into_owned()],
+            format: CreateFormat::Zip, level: 5, password: None, encrypt_names: false,
+            skip_junk: true, windows_safe: false, mac_metadata: false,
+        };
+        let result = create_archive(req, Arc::new(CancelWhenRead(cancel.clone())), cancel);
+        assert!(matches!(result, Err(piesi_ffi::PiesiError::Cancelled)), "{result:?}");
+        if existing { assert_eq!(fs::read(&out).unwrap(), b"original archive"); }
+        else { assert!(!out.exists()); }
+        assert!(!fs::read_dir(&dir).unwrap().flatten().any(|e| e.file_name().to_string_lossy().starts_with(".piesi-output-")));
+    }
+    fs::remove_dir_all(dir).unwrap();
+}
+
+/// 请求验证失败不能触发旧 FFI 的无条件删除逻辑，已有目标必须保留。
+#[test]
+fn invalid_create_keeps_existing_destination() {
+    let dir = scratch("keep-existing");
+    let dest = dir.join("existing.zip");
+    fs::write(&dest, b"keep this").unwrap();
+    let request = CreateRequest {
+        dest: dest.to_string_lossy().into_owned(), sources: vec![dir.join("missing.txt").to_string_lossy().into_owned()],
+        format: CreateFormat::Zip, level: 5, password: None, encrypt_names: false,
+        skip_junk: true, windows_safe: false, mac_metadata: false,
+    };
+    assert!(create_archive(request, Arc::new(Quiet), CancelHandle::new()).is_err());
+    assert_eq!(fs::read(&dest).unwrap(), b"keep this");
+    fs::remove_dir_all(dir).unwrap();
+}
+
+/// 成功替换已有私有目标时也要保留权限，不能因原子改名变成全员可读。
+#[cfg(unix)]
+#[test]
+fn overwrite_keeps_private_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = scratch("private-mode");
+    let dest = dir.join("existing.zip");
+    let source = dir.join("source.txt");
+    fs::write(&dest, b"old").unwrap();
+    fs::set_permissions(&dest, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(&source, b"new content").unwrap();
+    let request = CreateRequest {
+        dest: dest.to_string_lossy().into_owned(), sources: vec![source.to_string_lossy().into_owned()],
+        format: CreateFormat::Zip, level: 5, password: None, encrypt_names: false,
+        skip_junk: true, windows_safe: false, mac_metadata: false,
+    };
+    create_archive(request, Arc::new(Quiet), CancelHandle::new()).unwrap();
+    assert_eq!(fs::metadata(&dest).unwrap().permissions().mode() & 0o777, 0o600);
+    let archive = open_archive(dest.to_string_lossy().into_owned(), None).unwrap();
+    archive.verify(vec![], Arc::new(Quiet), CancelHandle::new()).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+}

@@ -172,6 +172,10 @@ mirror_enum! {
         TarEntryReadFailed,
         /// 写 tar 时给了非 tar 格式（内部错误）。args = [格式]
         NotTarFormat,
+        /// 创建格式不支持密码。
+        CreatePasswordUnsupported,
+        /// 单文件压缩流需要一个未被过滤的普通文件。
+        CreateSingleFileRequired,
 
         // ---- zip 结构 ----
         /// 文件太短，不是 zip
@@ -891,6 +895,12 @@ pub enum CreateFormat {
     TarGz,
     TarXz,
     TarZst,
+    Tar,
+    TarBz2,
+    Gz,
+    Bz2,
+    Xz,
+    Zst,
 }
 
 impl From<CreateFormat> for piesi_core::create::CreateFormat {
@@ -901,6 +911,12 @@ impl From<CreateFormat> for piesi_core::create::CreateFormat {
             CreateFormat::TarGz => Self::TarGz,
             CreateFormat::TarXz => Self::TarXz,
             CreateFormat::TarZst => Self::TarZst,
+            CreateFormat::Tar => Self::Tar,
+            CreateFormat::TarBz2 => Self::TarBz2,
+            CreateFormat::Gz => Self::Gz,
+            CreateFormat::Bz2 => Self::Bz2,
+            CreateFormat::Xz => Self::Xz,
+            CreateFormat::Zst => Self::Zst,
         }
     }
 }
@@ -971,9 +987,6 @@ pub fn create_archive(request: CreateRequest, listener: Arc<dyn ProgressListener
             skipped_junk: report.skipped_junk,
             warnings: convert_warnings(report.warnings),
         }),
-        Err(e) => {
-            let _ = std::fs::remove_file(dest);
-            Err(e.into())
-        }
+        Err(e) => Err(e.into()),
     }
 }

@@ -43,15 +43,19 @@ piesi a archive.zip folder
 piesi a encrypted.zip -p password folder
 piesi a encrypted.7z -p password --encrypt-names folder
 piesi a archive.tar.zst folder
+piesi a archive.tar.bz2 folder
+piesi a content.txt.gz content.txt
 ```
 
 支持读取 ZIP、7z、RAR、tar、gz、bz2、xz、zst，以及已支持的分卷与加密变体。
-可创建 ZIP、7z、tar.gz、tar.xz、tar.zst；不能创建 RAR。
+可创建 ZIP、7z、TAR、tar.gz、tar.bz2、tar.xz、tar.zst，以及单文件 gz、bz2、xz、zst；不能创建 RAR。
 文件名编码默认自动识别，必要时用 `--encoding gb18030` 手动指定。
 默认跳过 `__MACOSX`、`.DS_Store` 等垃圾；同名文件默认改名，可用 `--overwrite` 或 `--skip` 调整。
 `--mac-metadata` 在 Windows / Linux 上不读取 macOS 元数据；Unix 权限位仅在 Unix 系统还原。
 Windows 创建符号链接需要开发者模式或相应权限，失败时跳过链接并输出警告；悬空目录链接无法推断目录类型，按文件链接尝试。
 Windows 上游 unrar 不支持还原 RAR4 的符号链接，此类链接会跳过并告警；RAR4 普通文件和 RAR5 链接不受此限制。
+
+裸压缩流只接受一个普通文件，不能接收目录、符号链接或多个输入。只有 ZIP / 7z 支持密码，其他格式传入密码会报错。默认按 CPU 与当前内存预算自动分配线程；`--threads` 可限制线程数，`--level 7` 到 `9` 优先追求压缩率。调度细节见 [压缩领域说明](compression.md)。
 
 ## 卸载与更新
 

@@ -18,6 +18,12 @@ pub enum CreateFormat {
     TarGz,
     TarXz,
     TarZst,
+    Tar,
+    TarBz2,
+    Gz,
+    Bz2,
+    Xz,
+    Zst,
 }
 
 impl CreateFormat {
@@ -29,7 +35,23 @@ impl CreateFormat {
             CreateFormat::TarGz => "tar.gz",
             CreateFormat::TarXz => "tar.xz",
             CreateFormat::TarZst => "tar.zst",
+            CreateFormat::Tar => "tar",
+            CreateFormat::TarBz2 => "tar.bz2",
+            CreateFormat::Gz => "gz",
+            CreateFormat::Bz2 => "bz2",
+            CreateFormat::Xz => "xz",
+            CreateFormat::Zst => "zst",
         }
+    }
+
+    /// 裸压缩流只能接收一个普通文件，不包含路径、目录或元数据。
+    pub fn is_single_file(self) -> bool {
+        matches!(self, Self::Gz | Self::Bz2 | Self::Xz | Self::Zst)
+    }
+
+    /// 只有 ZIP 和 7z 支持口令加密。
+    pub fn supports_password(self) -> bool {
+        matches!(self, Self::Zip | Self::SevenZ)
     }
 }
 
@@ -186,9 +208,55 @@ pub struct CreateReport {
     pub warnings: Vec<Warning>,
 }
 
+/// 结果直接写入同目录的待完成文件，成功后只做一次原子改名；失败不影响已有目标。
+struct PendingOutput {
+    path: PathBuf,
+}
+
+impl PendingOutput {
+    /// 排他创建随机路径，避免不同任务共享输出文件。
+    fn new(dest: &Path) -> Result<Self> {
+        let mut nonce = [0u8; 16];
+        getrandom::fill(&mut nonce).map_err(Error::other)?;
+        let name: String = nonce.iter().map(|byte| format!("{byte:02x}")).collect();
+        let path = dest.parent().unwrap_or(Path::new(".")).join(format!(".piesi-output-{name}.tmp"));
+        std::fs::OpenOptions::new().write(true).create_new(true).open(&path)?;
+        let pending = Self { path };
+        // Unix 上替换已有私有归档时保留原权限，避免新 inode 因 umask 而放宽可读范围。
+        #[cfg(unix)]
+        if let Ok(metadata) = std::fs::metadata(dest) {
+            if metadata.is_file() { std::fs::set_permissions(&pending.path, metadata.permissions())?; }
+        }
+        Ok(pending)
+    }
+
+    /// 写入器已同步并关闭文件，此处不再复制数据。
+    fn commit(self, dest: &Path) -> Result<()> {
+        std::fs::rename(&self.path, dest)?;
+        Ok(())
+    }
+}
+
+impl Drop for PendingOutput {
+    /// 改名成功时旧路径已不存在；错误、取消或提交失败时回收未完成结果。
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
 /// 创建压缩包。`dest` 已存在会被覆盖（调用方负责确认）。
 pub fn create_archive(dest: &Path, roots: &[PathBuf], opts: &CreateOptions, ctx: &OpContext<'_>) -> Result<CreateReport> {
+    ctx.cancel.check()?;
+    if opts.password.is_some() && !opts.format.supports_password() {
+        return Err(Error::Unsupported(crate::DetailKind::CreatePasswordUnsupported.into()));
+    }
+    if opts.format.is_single_file()
+        && (roots.len() != 1 || !std::fs::symlink_metadata(&roots[0])?.file_type().is_file())
+    {
+        return Err(Error::Unsupported(crate::DetailKind::CreateSingleFileRequired.into()));
+    }
     let sources = collect_sources(roots, opts)?;
+    let pending = PendingOutput::new(dest)?;
     let mut report = CreateReport {
         entries: sources.items.len() as u64,
         input_bytes: sources.total_bytes,
@@ -196,16 +264,23 @@ pub fn create_archive(dest: &Path, roots: &[PathBuf], opts: &CreateOptions, ctx:
         warnings: sources.warnings.clone(),
         ..Default::default()
     };
-    match opts.format {
-        CreateFormat::Zip => report.warnings.extend(crate::create::zip_writer::write_zip(dest, &sources, opts, ctx)?),
-        CreateFormat::SevenZ => crate::create::sevenz_writer::write_7z(dest, &sources, opts, ctx)?,
-        CreateFormat::TarGz | CreateFormat::TarXz | CreateFormat::TarZst => report.warnings.extend(crate::create::tar_writer::write_tar(dest, &sources, opts, ctx)?),
-    }
-    report.output_bytes = std::fs::metadata(dest)?.len();
+    let warnings = match opts.format {
+        CreateFormat::Zip => zip_writer::write_zip(&pending.path, &sources, opts, ctx),
+        CreateFormat::SevenZ => sevenz_writer::write_7z(&pending.path, &sources, opts, ctx).map(|()| Vec::new()),
+        CreateFormat::Tar | CreateFormat::TarGz | CreateFormat::TarBz2 | CreateFormat::TarXz | CreateFormat::TarZst => tar_writer::write_tar(&pending.path, &sources, opts, ctx),
+        CreateFormat::Gz | CreateFormat::Bz2 | CreateFormat::Xz | CreateFormat::Zst => stream_writer::write_stream(&pending.path, &sources, opts, ctx).map(|()| Vec::new()),
+    };
+    report.warnings.extend(warnings.map_err(|error| if ctx.cancel.is_cancelled() { Error::Cancelled } else { error })?);
+    report.output_bytes = std::fs::metadata(&pending.path)?.len();
+    ctx.cancel.check()?;
+    pending.commit(dest)?;
     Ok(report)
 }
 
 pub mod apple_double;
+mod compression;
+mod parallel_stream;
 pub mod sevenz_writer;
+mod stream_writer;
 pub mod tar_writer;
 pub mod zip_writer;

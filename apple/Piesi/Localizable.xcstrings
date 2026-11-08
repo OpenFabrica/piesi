@@ -365,62 +365,6 @@
         }
       }
     },
-    "7z · 密码 + 文件名加密": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "7z · Password + encrypted names"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "7z · パスワード + ファイル名の暗号化"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "7z · 密码 + 文件名加密"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "7z · 密碼 + 檔名加密"
-          }
-        }
-      }
-    },
-    "7z · 级别 7": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "7z · Level 7"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "7z · レベル 7"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "7z · 级别 7"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "7z · 等級 7"
-          }
-        }
-      }
-    },
     "7z 压缩方法 %@": {
       "localizations": {
         "en": {
@@ -1593,62 +1537,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Windows 磁碟機代號：%@"
-          }
-        }
-      }
-    },
-    "ZIP · Windows 安全文件名": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ZIP · Windows-safe names"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ZIP · Windows で安全なファイル名"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ZIP · Windows 安全文件名"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ZIP · Windows 安全檔名"
-          }
-        }
-      }
-    },
-    "ZIP · 保留 Finder 标签等 Mac 元数据": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ZIP · Keeps Finder tags and other Mac metadata"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ZIP · Finder タグなどの Mac メタデータを保持"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ZIP · 保留 Finder 标签等 Mac 元数据"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ZIP · 保留 Finder 標籤等 Mac 中繼資料"
           }
         }
       }
@@ -4005,6 +3893,34 @@
         }
       }
     },
+    "已展开": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已展开"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已展開"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        }
+      }
+    },
     "已开启。右键菜单里直接有「用 Piesi 解压到此处」等命令。": {
       "localizations": {
         "en": {
@@ -4029,6 +3945,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "已開啟。快速選單裡直接有「用 Piesi 解壓縮到這裡」等指令。"
+          }
+        }
+      }
+    },
+    "已折叠": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapsed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已折叠"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已摺疊"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapsed"
           }
         }
       }
@@ -7141,6 +7085,50 @@
         }
       }
     },
+    "该格式不支持密码加密，请选择 ZIP 或 7z": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This format does not support password encryption. Choose ZIP or 7z."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该格式不支持密码加密，请选择 ZIP 或 7z"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此格式不支援密碼加密，請選擇 ZIP 或 7z"
+          }
+        }
+      }
+    },
+    "该格式只接受一个普通文件；多个文件或文件夹请选择 TAR 系列、ZIP 或 7z": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This format accepts one regular file. For multiple files or folders, choose a TAR format, ZIP, or 7z."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该格式只接受一个普通文件；多个文件或文件夹请选择 TAR 系列、ZIP 或 7z"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此格式只接受一個一般檔案；多個檔案或資料夾請選擇 TAR 系列、ZIP 或 7z"
+          }
+        }
+      }
+    },
     "读取 Mac 元数据失败，已跳过：%@：%@": {
       "localizations": {
         "en": {
@@ -7809,6 +7797,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "選擇解壓縮位置（%lld 項）"
+          }
+        }
+      }
+    },
+    "选择预设…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Preset…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择预设…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇預設…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Preset…"
           }
         }
       }

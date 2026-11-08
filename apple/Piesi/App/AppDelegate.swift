@@ -163,7 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case .browse:
             openQueue.enqueue(OpenRequest(urls: urls, browse: true))
         case .compress:
-            openQueue.enqueue(OpenRequest(urls: urls, browse: false, compressAll: true))
+            openQueue.enqueue(OpenRequest(urls: urls, browse: false, compressAll: true, compressionFormat: request.format))
         }
         return true
     }
@@ -329,7 +329,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// 剩下的普通文件（拖到 Dock 图标 / 主窗口）合成一个压缩请求。compressAll 时不分类，全部进压缩对话框。
     private func handle(_ request: OpenRequest) async {
         if request.compressAll {
-            await compressor.start(sources: request.urls, parent: nil)
+            if let format = request.compressionFormat {
+                await compressor.quickCreate(sources: request.urls, format: format.coreFormat)
+            } else {
+                await compressor.start(sources: request.urls, parent: nil)
+            }
             return
         }
         var archives: [URL] = []

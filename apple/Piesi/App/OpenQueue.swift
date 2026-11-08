@@ -8,6 +8,8 @@ struct OpenRequest: Sendable {
     let browse: Bool
     /// true = 不分压缩包和普通文件，全部进压缩对话框（Finder 右键「用 Piesi 压缩」）
     var compressAll = false
+    /// Finder 选定格式后直接创建，nil 则显示对话框。
+    var compressionFormat: CompressionFormat? = nil
 }
 
 /// 串行队列。start() 之前到的请求先攒着（Finder 的 open 事件比 didFinishLaunching 早）。

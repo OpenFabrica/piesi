@@ -37,7 +37,7 @@ def main() -> None:
         modified = 1_704_209_400
         os.utime(source / "内容.txt", (modified, modified))
         (source / "empty.txt").write_bytes(b"")
-        for extension in ("zip", "7z", "tar.gz", "tar.xz", "tar.zst"):
+        for extension in ("zip", "7z", "tar", "tar.gz", "tar.bz2", "tar.xz", "tar.zst"):
             name = f"中文压缩包.{extension}"
             check(binary, work, "a", name, source.name, "-q")
             if extension == "zip":
@@ -52,6 +52,17 @@ def main() -> None:
             assert (destination / source.name / "内容.txt").read_bytes() == data
             assert abs((destination / source.name / "内容.txt").stat().st_mtime - modified) < 2
             assert (destination / source.name / "empty.txt").read_bytes() == b""
+        for extension in ("gz", "bz2", "xz", "zst"):
+            name = f"内容.txt.{extension}"
+            check(binary, work, "a", name, str(source / "内容.txt"), "-q")
+            check(binary, work, "t", name, "-q")
+            destination = work / f"out-{extension}"
+            check(binary, work, "x", name, "-o", str(destination), "--no-smart-folder", "-q")
+            assert (destination / "内容.txt").read_bytes() == data
+            check(binary, work, "a", f"invalid.{extension}", source.name, "-q", success=False)
+        check(binary, work, "a", "invalid.tar.gz", source.name, "-p", "password", "-q", success=False)
+        check(binary, work, "a", "one-thread.zip", source.name, "--threads", "1", "-q")
+        check(binary, work, "t", "one-thread.zip", "-q")
         for extension in ("zip", "7z"):
             name = f"encrypted.{extension}"
             extra = ["--encrypt-names"] if extension == "7z" else []

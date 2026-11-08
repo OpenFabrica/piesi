@@ -2661,6 +2661,50 @@
         }
       }
     },
+    "该格式不支持密码加密，请选择 ZIP 或 7z": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This format does not support password encryption. Choose ZIP or 7z."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该格式不支持密码加密，请选择 ZIP 或 7z"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此格式不支援密碼加密，請選擇 ZIP 或 7z"
+          }
+        }
+      }
+    },
+    "该格式只接受一个普通文件；多个文件或文件夹请选择 TAR 系列、ZIP 或 7z": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This format accepts one regular file. For multiple files or folders, choose a TAR format, ZIP, or 7z."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该格式只接受一个普通文件；多个文件或文件夹请选择 TAR 系列、ZIP 或 7z"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此格式只接受一個一般檔案；多個檔案或資料夾請選擇 TAR 系列、ZIP 或 7z"
+          }
+        }
+      }
+    },
     "读取文件尾部失败": {
       "localizations": {
         "en": {

@@ -1,4 +1,4 @@
-//! tar.gz / tar.xz / tar.zst 写入器：tar crate 打包，外层压缩流（xz、zstd 多线程）。
+//! tar / tar.gz / tar.bz2 / tar.xz / tar.zst 写入器：tar crate 打包，外层压缩流（xz、zstd 多线程）。
 //!
 //! 「Mac 专用」时照 macOS 自带 bsdtar（libarchive 3.7 + copyfile）的做法把元数据写两份：
 //! - 同目录的 `._名字` AppleDouble 条目，放在条目自己前面：macOS 上 `tar -x`、归档工具默认靠它还原；
@@ -6,15 +6,15 @@
 //!   `bsdtar --xattrs`、GNU tar `--xattrs` 靠它还原，Finder 信息和资源分支也作为同名 xattr 写进去。
 
 use std::fs::File;
-use std::io::{self, BufWriter, Read, Write};
+use std::io::{self, Read, Write};
 use std::path::Path;
 
 use crate::archive::EntryKind;
 use crate::create::apple_double::{self, MacMetadata};
-use crate::create::{CreateFormat, CreateOptions, SourceItem, Sources};
+use crate::create::{CreateOptions, SourceItem, Sources};
 use crate::progress::{OpContext, Throttle};
 use crate::warning::{Warning, WarningKind};
-use crate::{Error, Result};
+use crate::Result;
 
 /// 边读边报进度的读取器（tar 写入是单线程顺序的，直接借用 Throttle）。
 struct ProgressRead<'a, 'b> {
@@ -32,26 +32,7 @@ impl Read for ProgressRead<'_, '_> {
 
 /// 写出 tar.*，返回「Mac 专用」读元数据时产生的警告。
 pub fn write_tar(dest: &Path, sources: &Sources, opts: &CreateOptions, ctx: &OpContext<'_>) -> Result<Vec<Warning>> {
-    let threads = if opts.threads == 0 { std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4) } else { opts.threads } as u32;
-    let file = BufWriter::with_capacity(1 << 20, File::create(dest)?);
-    let encoder: Box<dyn FinishWrite> = match opts.format {
-        CreateFormat::TarGz => Box::new(flate2::write::GzEncoder::new(file, flate2::Compression::new(opts.level.clamp(1, 9) as u32))),
-        CreateFormat::TarXz => {
-            // xz 的多线程编码：按块切分并行，preset 对应 0–9
-            let stream = liblzma::stream::MtStreamBuilder::new()
-                .preset(opts.level.clamp(0, 9) as u32)
-                .threads(threads)
-                .encoder()
-                .map_err(Error::other)?;
-            Box::new(liblzma::write::XzEncoder::new_stream(file, stream))
-        }
-        CreateFormat::TarZst => {
-            let mut enc = zstd::stream::write::Encoder::new(file, zstd_level(opts.level)).map_err(Error::other)?;
-            enc.multithread(threads).map_err(Error::other)?;
-            Box::new(enc)
-        }
-        other => return Err(Error::Unsupported(crate::ErrorDetail::with(crate::DetailKind::NotTarFormat, format!("{other:?}")))),
-    };
+    let encoder = super::compression::encoder(dest, opts, sources.total_bytes)?;
     let mut builder = tar::Builder::new(encoder);
     builder.follow_symlinks(false);
     let mut throttle = Throttle::new(ctx, Some(sources.total_bytes), Some(sources.items.len() as u64));
@@ -202,51 +183,6 @@ fn base64_no_pad(data: &[u8]) -> String {
         }
     }
     out
-}
-
-/// 把 0–9 映射到 zstd 的 1–19。
-fn zstd_level(level: u8) -> i32 {
-    match level.clamp(1, 9) {
-        1 => 1,
-        2 => 2,
-        3 => 3,
-        4 => 5,
-        5 => 7,
-        6 => 10,
-        7 => 13,
-        8 => 16,
-        _ => 19,
-    }
-}
-
-/// 能收尾的写入器：各压缩流的 finish 签名不同，这里统一成一个 trait 方便装箱。
-trait FinishWrite: Write {
-    /// 写出尾部并落盘。
-    fn finish_boxed(self: Box<Self>) -> io::Result<()>;
-}
-
-impl FinishWrite for flate2::write::GzEncoder<BufWriter<File>> {
-    fn finish_boxed(self: Box<Self>) -> io::Result<()> {
-        let mut w = (*self).finish()?;
-        w.flush()?;
-        w.get_ref().sync_all()
-    }
-}
-
-impl FinishWrite for liblzma::write::XzEncoder<BufWriter<File>> {
-    fn finish_boxed(self: Box<Self>) -> io::Result<()> {
-        let mut w = (*self).finish()?;
-        w.flush()?;
-        w.get_ref().sync_all()
-    }
-}
-
-impl FinishWrite for zstd::stream::write::Encoder<'static, BufWriter<File>> {
-    fn finish_boxed(self: Box<Self>) -> io::Result<()> {
-        let mut w = (*self).finish()?;
-        w.flush()?;
-        w.get_ref().sync_all()
-    }
 }
 
 #[cfg(test)]

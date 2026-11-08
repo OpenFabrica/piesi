@@ -74,7 +74,7 @@ struct CompressFilesIntent: AppIntent {
     }
 }
 
-/// 预设卡片在快捷指令里的样子（名字和压缩对话框一致）。
+/// 快捷指令中的预设名称，与压缩对话框的高级菜单一致。
 extension CompressPreset: AppEnum {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "压缩预设")
     static let caseDisplayRepresentations: [CompressPreset: DisplayRepresentation] = [

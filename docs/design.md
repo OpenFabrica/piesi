@@ -179,7 +179,9 @@
 - 拖入 = 添加到包；拖出 = 解压到 Finder（`NSFilePromiseProvider`）；双击条目 = Quick Look；⌘↓ = 临时解压后用默认 app 打开。
 
 ### 6.2 压缩对话框（Finder 右键或拖到 Dock 触发）
-预设卡片：[发给 Windows（ZIP）] [最小体积（7z）] [加密（7z）] [Mac 专用（ZIP）]，下方「高级」：格式、级别、密码、分卷大小、排除规则。
+默认直接选择格式、文件名和位置。「高级」整行可点击展开，其中提供可选预设（发给 Windows / 最小体积 / 加密 / Mac 专用）、级别、密码与文件名加密、垃圾过滤、Windows 安全名、Mac 元数据。高级区域可滚动，底部确认与取消按钮保持可见。
+
+支持创建 ZIP、7z、TAR、tar.gz、tar.bz2、tar.xz、tar.zst；只选一个普通文件时另可创建 gz、bz2、xz、zst。只有 ZIP / 7z 支持密码；选择其他格式时清空密码，不能静默生成未加密文件。性能调度见 [compression.md](compression.md)。
 
 ### 6.3 默认行为（用户已定：双击直接解压）
 - 双击压缩包：**直接解压到压缩包旁边**，只显示一个小进度浮窗。例外：包加密 → 先要密码；编码置信度低 → 先弹带样本名的编码选择条；目标已存在 → 冲突策略。
@@ -195,7 +197,7 @@
 - Finder 右键：`NSServices`（「用 Piesi 压缩」「用 Piesi 解压到此处」「用 Piesi 查看」，在「服务」二级菜单）+ App Intents（可做 Quick Action）+ Finder Sync 扩展（右键菜单顶层，见下）。
 - Quick Look 扩展：空格预览包内文件列表；appex 永远沙盒且内存受限，**只做索引不解压**，列表最多 1 万行；头加密的 7z 无法预览（不能要密码）。
 - Finder 右键菜单顶层（已实现，2026-10-20，`apple/PiesiFinder/`）：原先认为 Finder Sync 为同步盘设计、不用；后来要像 Gemini 那样把命令放在右键菜单顶层、带图标，只有 Finder Sync 能做到，于是改用。
-  - 菜单：选中的全是压缩包（按扩展名，类型表在扩展 Info.plist 的 `PiesiArchiveTypes`，与主 app 的 `CFBundleDocumentTypes` 保持一致）→「用 Piesi 解压到此处」，只选一个时再加「用 Piesi 查看」；否则 →「用 Piesi 压缩」。
+  - 菜单：选中的全是压缩包（按扩展名，类型表在扩展 Info.plist 的 `PiesiArchiveTypes`，与主 app 的 `CFBundleDocumentTypes` 保持一致）→「用 Piesi 解压到此处」，只选一个时再加「用 Piesi 查看」；压缩入口始终提供「用 Piesi 压缩」格式子菜单，选择格式即在源目录创建、重名加序号；只选一个普通文件时显示裸压缩流格式。「自定义压缩…」进入对话框。
   - 监视范围：`/` 加所有已挂载的卷（只设 `/` 时 U 盘、磁盘映像里没有菜单，实测），插拔磁盘时更新；不设角标。
   - Finder 在后台队列调 `menu(for:)`（实测），NSMenu 要切到主线程建。
   - 交接：扩展沙盒，只把命令和路径写进 App Group（`$(DEVELOPMENT_TEAM).com.citrolabs.piesi`，团队 ID 开头，macOS 上不要描述文件）的 `FinderRequests/<UUID>.json`，再用 `piesi://finder?id=<UUID>` 拉起扩展所在的那份 app。链接不带路径：网页也能打开 `piesi://`，伪造的 id 找不到文件就忽略，app 按普通启动处理。主 app 取走即删，超过 1 小时没取的也清掉。

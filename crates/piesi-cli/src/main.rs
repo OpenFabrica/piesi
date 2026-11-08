@@ -117,7 +117,7 @@ enum Cmd {
         archive: PathBuf,
         /// 要压缩的文件或目录
         paths: Vec<PathBuf>,
-        /// 格式：zip / 7z / tgz / txz / tzst（默认按扩展名）
+        /// 格式：zip / 7z / tar / tar.gz / tar.bz2 / tar.xz / tar.zst / gz / bz2 / xz / zst（默认按扩展名）
         #[arg(long)]
         format: Option<String>,
         /// 压缩级别 0-9（0 = 仅存储）
@@ -158,6 +158,18 @@ fn pick_format(explicit: Option<&str>, archive: &std::path::Path) -> anyhow::Res
         Some(CreateFormat::TarXz)
     } else if name.ends_with(".tar.zst") || name.ends_with(".tzst") {
         Some(CreateFormat::TarZst)
+    } else if name.ends_with(".tar.bz2") || name.ends_with(".tbz2") || name.ends_with(".tbz") {
+        Some(CreateFormat::TarBz2)
+    } else if name.ends_with(".tar") {
+        Some(CreateFormat::Tar)
+    } else if name.ends_with(".gz") {
+        Some(CreateFormat::Gz)
+    } else if name.ends_with(".bz2") {
+        Some(CreateFormat::Bz2)
+    } else if name.ends_with(".xz") {
+        Some(CreateFormat::Xz)
+    } else if name.ends_with(".zst") {
+        Some(CreateFormat::Zst)
     } else if name.ends_with(".7z") {
         Some(CreateFormat::SevenZ)
     } else if name.ends_with(".zip") {
@@ -166,6 +178,12 @@ fn pick_format(explicit: Option<&str>, archive: &std::path::Path) -> anyhow::Res
         None
     };
     match explicit.map(|s| s.to_ascii_lowercase()).as_deref() {
+        Some("tar") => Ok(CreateFormat::Tar),
+        Some("tbz") | Some("tbz2") | Some("tar.bz2") => Ok(CreateFormat::TarBz2),
+        Some("gz") => Ok(CreateFormat::Gz),
+        Some("bz2") => Ok(CreateFormat::Bz2),
+        Some("xz") => Ok(CreateFormat::Xz),
+        Some("zst") => Ok(CreateFormat::Zst),
         Some("zip") => Ok(CreateFormat::Zip),
         Some("7z") => Ok(CreateFormat::SevenZ),
         Some("tgz") | Some("tar.gz") => Ok(CreateFormat::TarGz),

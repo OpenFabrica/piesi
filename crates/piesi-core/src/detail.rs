@@ -76,6 +76,10 @@ pub enum DetailKind {
     TarEntryReadFailed,
     /// 写 tar 时给了非 tar 格式（内部错误）。args = [格式]
     NotTarFormat,
+    /// 创建格式不支持密码。
+    CreatePasswordUnsupported,
+    /// 单文件压缩流需要一个未被过滤的普通文件。
+    CreateSingleFileRequired,
 
     // ---- zip 结构 ----
     /// 文件太短，不是 zip
@@ -260,6 +264,8 @@ impl fmt::Display for ErrorDetail {
             K::SevenZLibrary => write!(f, "7z：{a}"),
             K::TarDriverMismatch => write!(f, "tar 驱动不处理 {a}"),
             K::TarEntryReadFailed => write!(f, "tar 第 {a} 个条目读取失败：{b}"),
+            K::CreatePasswordUnsupported => write!(f, "该格式不支持密码加密，请选择 ZIP 或 7z"),
+            K::CreateSingleFileRequired => write!(f, "该格式只接受一个普通文件；多个文件或文件夹请选择 TAR 系列、ZIP 或 7z"),
             K::NotTarFormat => write!(f, "{a} 不是 tar 格式"),
             K::ZipTooShort => f.write_str("文件太短，不是 zip"),
             K::ZipTailReadFailed => f.write_str("读取文件尾部失败"),

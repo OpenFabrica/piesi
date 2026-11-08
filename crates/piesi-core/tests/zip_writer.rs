@@ -1,4 +1,4 @@
-//! ZIP 写入器集成测试：用自己的读取器回读，覆盖内存路径、溢出到临时文件的大文件路径、不可压缩改存储。
+//! ZIP 写入器集成测试：用自己的读取器回读，覆盖内存路径、直接流式写入的大文件路径、不可压缩改存储。
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -47,13 +47,13 @@ fn workdir(tag: &str) -> PathBuf {
     d
 }
 
-/// 65 MB 可压缩文件走溢出路径，1 MB 随机数据走「没变小改存储」，小文本走内存路径；全部回读校验 CRC。
+/// 65 MB 可压缩文件走流式路径，1 MB 随机数据走「没变小改存储」，小文本走内存路径；全部回读校验 CRC。
 #[test]
-fn spill_store_and_memory_paths_roundtrip() {
+fn stream_store_and_memory_paths_roundtrip() {
     let work = workdir("mix");
     let src = work.join("src");
     std::fs::create_dir_all(src.join("sub")).unwrap();
-    // 65 MB：超过 64 MB 的溢出阈值；内容有规律，deflate 会明显变小
+    // 65 MB：覆盖直接流式写入；内容有规律，deflate 会明显变小
     let chunk: Vec<u8> = (0..4096u32).map(|i| (i % 251) as u8).collect();
     let mut big = std::io::BufWriter::new(std::fs::File::create(src.join("big.bin")).unwrap());
     for _ in 0..(65 * 1024 * 1024 / 4096) {
@@ -80,10 +80,6 @@ fn spill_store_and_memory_paths_roundtrip() {
     let report = create_archive(&out, std::slice::from_ref(&src), &opts, &OpContext::silent()).unwrap();
     assert_eq!(report.skipped_junk, 1);
     assert!(report.output_bytes < report.input_bytes / 2, "65 MB 规律数据应明显压缩：{} / {}", report.output_bytes, report.input_bytes);
-    // 临时文件必须已清理
-    let leftovers: Vec<_> = std::fs::read_dir(&work).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().contains("piesi-zip-")).collect();
-    assert!(leftovers.is_empty(), "残留临时文件：{leftovers:?}");
-
     let mut reader = piesi_core::open(&out).unwrap();
     let entries = reader.entries().to_vec();
     let by_name = |n: &str| entries.iter().find(|e| String::from_utf8_lossy(&e.raw_name).ends_with(n)).cloned().unwrap();
@@ -211,4 +207,129 @@ fn aes_non_ascii_password() {
     assert_eq!(sink.files.len(), 1);
     assert_eq!(sink.files[0].1, crc32fast::hash(&std::fs::read(src.join("a.txt")).unwrap()));
     std::fs::remove_dir_all(&work).unwrap();
+}
+
+/// 单个大文件尚未结束就上报字节进度，取消不必等待整份文件压完。
+#[test]
+fn progress_during_single_file() {
+    use std::sync::Mutex;
+    use piesi_core::progress::{CancelToken, Progress, ProgressEvent};
+    struct Events(Mutex<Vec<u64>>);
+    impl Progress for Events {
+        fn report(&self, event: &ProgressEvent) {
+            self.0.lock().unwrap().push(event.done_bytes);
+        }
+    }
+    let work = workdir("progress");
+    let source = work.join("large.bin");
+    let size = 12 * 1024 * 1024;
+    std::fs::write(&source, vec![42; size]).unwrap();
+    let events = Events(Mutex::new(Vec::new()));
+    let token = CancelToken::new();
+    create_archive(&work.join("out.zip"), &[source], &CreateOptions::default(), &OpContext::new(&events, &token)).unwrap();
+    let values = events.0.lock().unwrap();
+    assert!(values.iter().any(|&n| n > 0 && n < size as u64), "单文件处理期间没有字节进度：{values:?}");
+    assert_eq!(values.last(), Some(&(size as u64)));
+    std::fs::remove_dir_all(work).unwrap();
+}
+
+/// 单线程和双线程都必须正常创建，并且内容可回读。
+#[test]
+fn limited_workers_roundtrip() {
+    let work = workdir("workers");
+    let src = work.join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    for i in 0..12 {
+        std::fs::write(src.join(format!("{i}.txt")), format!("text {i}").repeat(200)).unwrap();
+    }
+    for threads in [1, 2] {
+        let out = work.join(format!("{threads}.zip"));
+        create_archive(&out, std::slice::from_ref(&src), &CreateOptions { threads, ..Default::default() }, &OpContext::silent()).unwrap();
+        let mut reader = piesi_core::open(&out).unwrap();
+        let mut sink = MemSink::default();
+        reader.extract(None, &mut sink, &OpContext::silent()).unwrap();
+        assert_eq!(sink.files.len(), 12);
+    }
+    std::fs::remove_dir_all(work).unwrap();
+}
+
+/// 抽样按内容判断：随机数据直接存储，伪装成视频的重复文本仍应压缩。
+#[test]
+fn adaptive_store_uses_content() {
+    let work = workdir("adaptive");
+    let src = work.join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    let random = pseudo_random(2 * 1024 * 1024);
+    std::fs::write(src.join("random.txt"), &random).unwrap();
+    std::fs::write(src.join("text.mp4"), b"repeat me\n".repeat(200_000)).unwrap();
+    let mut media = pseudo_random(9 * 1024 * 1024);
+    media[..65536].fill(0);
+    media[4..8].copy_from_slice(b"ftyp");
+    std::fs::write(src.join("media.mp4"), &media).unwrap();
+    for password in [None, Some("test-password".into())] {
+        let out = work.join(if password.is_some() { "encrypted.zip" } else { "plain.zip" });
+        create_archive(&out, std::slice::from_ref(&src), &CreateOptions { password: password.clone(), ..Default::default() }, &OpContext::silent()).unwrap();
+        let mut reader = piesi_core::open(&out).unwrap();
+        if let Some(pw) = password { reader.set_password(Some(&pw)).unwrap(); }
+        assert_eq!(reader.entries().iter().find(|e| e.raw_name.ends_with(b"random.txt")).unwrap().method, Method::Store);
+        assert_eq!(reader.entries().iter().find(|e| e.raw_name.ends_with(b"text.mp4")).unwrap().method, Method::Deflate);
+        assert_eq!(reader.entries().iter().find(|e| e.raw_name.ends_with(b"media.mp4")).unwrap().method, Method::Store);
+        let mut sink = MemSink::default();
+        reader.extract(None, &mut sink, &OpContext::silent()).unwrap();
+        assert!(sink.files.iter().any(|(_, crc, n)| *crc == crc32fast::hash(&random) && *n == random.len() as u64));
+        assert!(sink.files.iter().any(|(_, crc, n)| *crc == crc32fast::hash(&media) && *n == media.len() as u64));
+    }
+    std::fs::remove_dir_all(work).unwrap();
+}
+
+/// 单文件编码中取消必须及时生效，并返回统一 Cancelled 错误。
+#[test]
+fn cancel_during_encoding() {
+    use piesi_core::progress::{CancelToken, Progress, ProgressEvent};
+    struct CancelAfterChunk(CancelToken);
+    impl Progress for CancelAfterChunk {
+        fn report(&self, e: &ProgressEvent) {
+            if e.done_bytes > 0 { self.0.cancel(); }
+        }
+    }
+    let work = workdir("cancel");
+    let src = work.join("large.bin");
+    std::fs::write(&src, vec![42; 12 * 1024 * 1024]).unwrap();
+    let token = CancelToken::new();
+    let listener = CancelAfterChunk(token.clone());
+    let result = create_archive(&work.join("out.zip"), &[src], &CreateOptions::default(), &OpContext::new(&listener, &token));
+    assert!(matches!(result, Err(piesi_core::Error::Cancelled)), "{result:?}");
+    std::fs::remove_dir_all(work).unwrap();
+}
+
+/// 大文件分块 DEFLATE 在块边界、各级别和 AES 包装下仍兼容自己的读取器及 7-Zip。
+#[test]
+fn parallel_deflate_roundtrip() {
+    let work = workdir("parallel-deflate");
+    let source = work.join("source.bin");
+    let pattern = pseudo_random(16 * 1024);
+    // 超过两块，覆盖整块和非整块尾部；每 16 KiB 重复，必须真正走 deflate。
+    let mut content = pattern.repeat(560);
+    content.extend_from_slice(b"tail");
+    std::fs::write(&source, &content).unwrap();
+    for (level, password) in [(1, None), (5, None), (9, Some("test-pw".to_owned()))] {
+        let out = work.join(format!("level-{level}.zip"));
+        create_archive(&out, std::slice::from_ref(&source), &CreateOptions { level, threads: 4, password: password.clone(), ..Default::default() }, &OpContext::silent()).unwrap();
+        let mut reader = piesi_core::open(&out).unwrap();
+        reader.set_password(password.as_deref()).unwrap();
+        assert_eq!(reader.entries()[0].method, Method::Deflate);
+        assert!(std::fs::metadata(&out).unwrap().len() < content.len() as u64 / 10, "并行压缩不应丢掉可压缩内容的收益");
+        let mut sink = MemSink::default();
+        reader.extract(None, &mut sink, &OpContext::silent()).unwrap();
+        assert_eq!(sink.files[0].1, crc32fast::hash(&content));
+        assert_eq!(sink.files[0].2, content.len() as u64);
+        if Path::new("/opt/homebrew/bin/7zz").exists() {
+            let mut cmd = Command::new("/opt/homebrew/bin/7zz");
+            cmd.args(["t", "-y"]);
+            if let Some(pw) = &password { cmd.arg(format!("-p{pw}")); }
+            let result = cmd.arg(&out).output().unwrap();
+            assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stdout));
+        }
+    }
+    std::fs::remove_dir_all(work).unwrap();
 }

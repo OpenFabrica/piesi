@@ -2,6 +2,17 @@
 // 主 app 和 PiesiFinder 扩展都编译这个文件（project.yml）。
 import Foundation
 
+/// Finder 扩展与主应用共用的创建格式；不让轻量扩展链接 Rust 引擎。
+enum CompressionFormat: String, CaseIterable, Codable, Sendable {
+    case zip = "zip", sevenZ = "7z", tar = "tar", tarGz = "tar.gz", tarBz2 = "tar.bz2", tarXz = "tar.xz", tarZst = "tar.zst"
+    case gz = "gz", bz2 = "bz2", xz = "xz", zst = "zst"
+
+    var title: String { self == .zip ? "ZIP" : self == .tar ? "TAR" : rawValue }
+
+    /// 裸压缩流只支持一个普通文件。
+    var isSingleFile: Bool { [.gz, .bz2, .xz, .zst].contains(self) }
+}
+
 /// Finder 右键菜单发给主 app 的一次请求。
 struct FinderRequest: Codable, Sendable {
     /// 菜单命令：解压到压缩包旁边 / 浏览 / 压缩
@@ -11,6 +22,8 @@ struct FinderRequest: Codable, Sendable {
 
     let action: Action
     let paths: [String]
+    /// nil 打开自定义对话框；有格式时按默认选项直接压缩。旧请求没有该字段，仍可解码。
+    var format: CompressionFormat? = nil
 }
 
 /// 交接用的常量与读写。

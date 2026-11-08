@@ -122,13 +122,13 @@ fn worker_memory(level: u8) -> u64 {
     block * 2 + dict * tenths / 10 + (4 << 20)
 }
 
-/// 并行度：总线程数 = min(CPU, 内存预算 / 每线程内存)，预算取本机内存的 1/4。
+/// 并行度：总线程数 = min(CPU, 内存预算 / 每线程内存)，预算取物理内存一半与当前可用内存四分之三中的较小值。
 /// 为什么不拿 7zz 的峰值当标准：7zz 内存低是因为它每块用 2 个线程（匹配器单独一个线程），liblzma 没这个能力，
-/// 要紧的是小内存 Mac 不被挤爆——level 5 每线程按最坏情况（随机数据）约 625 MB：8 GB 机器预算 2 GB → 3 线程，
-/// 16 GB → 6 线程，48 GB → 12 GB 预算仍是 18 线程（实测常见数据每线程约 360 MB，所以这是保守值）。
+/// level 5 每线程按最坏情况（随机数据）约 625 MB 估算，避免在内存不足时靠交换空间维持并发。
+/// 并发数还受当前可用内存约束；每次压缩重新查询，不沿用启动时的资源快照。
 /// 同时压几个 solid 块（in_flight）和每块几个线程都从这一份总数里分，不各算各的。
 fn plan_parallelism(threads: usize, block_count: usize, level: u8) -> (usize, usize) {
-    let total = (crate::sys::physical_memory() / 4 / worker_memory(level).max(1)).clamp(1, threads.max(1) as u64) as usize;
+    let total = (crate::sys::compression_budget() / worker_memory(level).max(1)).clamp(1, threads.max(1) as u64) as usize;
     if block_count == 0 {
         return (1, total);
     }

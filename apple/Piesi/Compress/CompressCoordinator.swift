@@ -1,4 +1,4 @@
-// CompressCoordinator.swift —— 压缩流程（设计 6.2）：收集源 → 对话框（预设 / 高级）→ 后台 createArchive + 进度 → 收尾。
+// CompressCoordinator.swift —— 压缩流程：选定格式直接创建，或经对话框自定义后后台创建。
 import AppKit
 
 /// 对话框确认后的全部参数。
@@ -11,7 +11,7 @@ struct CompressOptions: Sendable {
     var encryptNames: Bool
     var skipJunk: Bool
     var windowsSafe: Bool
-    /// 保留 Finder 标签、xattr、资源分支（写成 __MACOSX/._ AppleDouble，和 ditto 一致）；只有 zip 支持
+    /// 保留 Finder 标签、xattr、资源分支；ZIP 与 TAR 系列支持
     var macMetadata: Bool
 }
 
@@ -39,6 +39,12 @@ final class CompressCoordinator {
         _ = await run(options, parent: parent)
     }
 
+    /// Finder 格式菜单：在源目录创建，同名自动加序号，默认不改写文件名。
+    func quickCreate(sources: [URL], format: CreateFormat) async {
+        guard let first = sources.first else { return }
+        let destination = ArchiveNaming.freeDestination(directory: first.deletingLastPathComponent(), baseName: ArchiveNaming.defaultBaseName(for: sources), format: format)
+        _ = await runHeadless(CompressOptions(destination: destination, sources: sources, format: format, level: 5, password: nil, encryptNames: false, skipJunk: true, windowsSafe: false, macMetadata: false))
+    }
     /// 无界面入口（-PiesiCompress 测试参数、App Intents）：不弹对话框，按给定参数直接压。成功返回输出路径。
     @discardableResult
     func runHeadless(_ options: CompressOptions) async -> URL? {
