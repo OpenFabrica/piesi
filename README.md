@@ -10,6 +10,23 @@ Windows / Linux 提供 x64 命令行安装包（Windows Setup / ZIP、Linux DEB 
 - 开发规则：`CLAUDE.md`
 - 发版规范：`docs/release.md`
 
+## 截图
+
+**浏览窗口**：Windows 中文版打的 GBK 文件名包，自动识别编码，不乱码；可搜索、Quick Look、拖出、校验。
+
+<img src="docs/images/browse.png" alt="浏览窗口" width="820">
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><b>压缩对话框</b>：直接选格式，级别、密码、清理垃圾文件等收在「高级」里。<br><img src="docs/images/compress.png" alt="压缩对话框"></td>
+    <td width="50%" valign="top"><b>Finder 右键菜单</b>：选格式直接压缩，也可以自定义。<br><img src="docs/images/finder-menu.png" alt="Finder 右键菜单"></td>
+  </tr>
+</table>
+
+**Quick Look**：在 Finder 里按空格预览压缩包条目树，不解压。
+
+<img src="docs/images/quicklook.png" alt="Quick Look 预览" width="640">
+
 ## 现状（v1.0 功能已齐，待发版）
 
 核心引擎已可用，命令行 `piesi` 可以：
